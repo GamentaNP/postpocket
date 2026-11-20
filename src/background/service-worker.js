@@ -107,50 +107,31 @@ chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
   /* Open a Facebook photo viewer in a background tab, harvest every image,
      then close it. Used when a post has a "+N remaining items" overlay. */
   if (msg.type === 'PP_EXPAND_POST') {
-    (async function () {
-      var tab = null;
-      try {
-        // Visible, user-initiated tab — never hidden or silently closed.
-        tab = await chrome.tabs.create({ url: msg.href, active: true });
-        await new Promise(function (r) { setTimeout(r, 1200); });
-        await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['src/shared/utils.js'] });
-        var injected = await chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          func: async function () {
-            function collect() {
-              var out = [], seen = new Set();
-              document.querySelectorAll('img').forEach(function (im) {
-                var src = im.currentSrc || im.src || '';
-                if (!/scontent.*fbcdn/i.test(src)) return;
-                if ((im.naturalWidth || 0) < 200) return;
-                var key = src.split('?')[0];
-                if (seen.has(key)) return;
-                seen.add(key);
-                out.push({
-                  url: src, alternates: [],
-                  ext: (window.FBPUtils && window.FBPUtils.extFromUrl(src)) || 'jpg',
-                  width: im.naturalWidth, height: im.naturalHeight
-                });
-              });
-              return out;
-            }
-            var deadline = Date.now() + 4500;
-            while (Date.now() < deadline) {
-              var found = collect();
-              if (found.length >= 3) return found;
-              await new Promise(function (r) { setTimeout(r, 300); });
-            }
-            return collect();
-          }
-        });
-        var images = (injected && injected[0] && injected[0].result) || [];
-        sendResponse(images.length ? { ok: true, data: images } : { ok: false, error: 'No images in photo viewer' });
-      } catch (e) {
-        sendResponse({ ok: false, error: String((e && e.message) || e) });
-      } finally {
-        // The viewer stays open. The user closes it when finished.
-      }
-    })();
+    // Open a VISIBLE viewer tab. Its own content script writes the collected
+    // images to local storage; we simply wait for that event. No long-running
+    // work here, so a service-worker restart cannot strand the request.
+    var token = U.uid('v');
+    var key = 'pp_viewer_' + token;
+    var href = msg.href + (msg.href.indexOf('#') >= 0 ? '&' : '#') + 'pp-expand=' + token;
+    var settled = false;
+    var timer = setTimeout(function () {
+      if (settled) return;
+      settled = true;
+      chrome.storage.onChanged.removeListener(onChange);
+      sendResponse({ ok: false, error: 'Viewer did not load images — close the tab and retry' });
+    }, 25000);
+
+    function onChange(changes, area) {
+      if (settled || area !== 'local' || !changes[key]) return;
+      settled = true;
+      clearTimeout(timer);
+      chrome.storage.onChanged.removeListener(onChange);
+      var images = (changes[key].newValue && changes[key].newValue.images) || [];
+      chrome.storage.local.remove(key);
+      sendResponse(images.length ? { ok: true, data: images } : { ok: false, error: 'No images in viewer' });
+    }
+    chrome.storage.onChanged.addListener(onChange);
+    chrome.tabs.create({ url: href, active: true });
     return true;
   }
 

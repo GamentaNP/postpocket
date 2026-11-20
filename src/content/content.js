@@ -10,6 +10,7 @@
   var U = window.FBPUtils;
 
   var STYLE_ID = 'ppf-styles';
+  var VIEWER_PREFIX = 'pp_viewer_';
   var CSS = [
     '.ppf-widget{position:absolute;top:8px;right:8px;z-index:2147483000;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}',
     '.ppf-btn{display:flex;align-items:center;gap:5px;border:1px solid #fff;border-radius:999px;',
@@ -38,6 +39,43 @@
     s.id = STYLE_ID; s.textContent = CSS;
     (document.head || document.documentElement).appendChild(s);
   }
+
+  function extractViewerImages() {
+    var out = [], seen = new Set();
+    Array.prototype.forEach.call(document.querySelectorAll('img'), function (im) {
+      var src = im.currentSrc || im.src || '';
+      if (!/scontent.*fbcdn/i.test(src)) return;
+      if ((im.naturalWidth || 0) < 200) return;
+      var key = src.split('?')[0];
+      if (seen.has(key)) return;
+      seen.add(key);
+      out.push({
+        url: src, alternates: [],
+        ext: U ? U.extFromUrl(src) : 'jpg',
+        width: im.naturalWidth, height: im.naturalHeight
+      });
+    });
+    return out;
+  }
+
+  /* When this tab was opened as a photo viewer, collect its images into
+     local storage so the originating post widget can pick them up. */
+  async function collectViewerImages(token) {
+    var key = VIEWER_PREFIX + token;
+    var deadline = Date.now() + 12000;
+    while (Date.now() < deadline) {
+      var images = extractViewerImages();
+      if (images.length >= 3) {
+        chrome.storage.local.set({ [key]: { at: Date.now(), images: images } });
+        return;
+      }
+      await new Promise(function (r) { setTimeout(r, 400); });
+    }
+    chrome.storage.local.set({ [key]: { at: Date.now(), images: extractViewerImages() } });
+  }
+
+  var viewerMatch = location.hash && location.hash.match(/pp-expand=([A-Za-z0-9_-]+)/);
+  if (viewerMatch) collectViewerImages(viewerMatch[1]);
 
   async function withThumbs(data) {
     if (!data) return data;
@@ -84,15 +122,32 @@
   }
 
   function expandPost(post) {
-    if (!post.expandHref || post.expanded) return Promise.resolve(post.images);
+    if (!post.expandHref || post.expanded || post.expanding) return Promise.resolve(post.images);
+    post.expanding = true;
+    var token = (U ? U.uid('v') : ('v' + Date.now().toString(36)));
+    var sep = post.expandHref.indexOf('#') >= 0 ? '&' : '#';
+    var href = post.expandHref + sep + 'pp-expand=' + token;
+    // Visible tab, opened from a real click. It stays open until you close it.
+    window.open(href, '_blank', 'noopener');
+    var key = VIEWER_PREFIX + token;
+
     return new Promise(function (resolve) {
-      chrome.runtime.sendMessage({ type: 'PP_EXPAND_POST', href: post.expandHref }, function (res) {
-        if (res && res.ok && res.data && res.data.length) {
-          post.images = res.data;
-          post.expanded = true;
-        }
+      var done = false;
+      function finish(images) {
+        if (done) return;
+        done = true;
+        clearInterval(poll); clearTimeout(timeout);
+        try { chrome.storage.local.remove(key); } catch (e) {}
+        if (images && images.length) { post.images = images; post.expanded = true; }
+        post.expanding = false;
         resolve(post.images);
-      });
+      }
+      var poll = setInterval(function () {
+        chrome.storage.local.get(key, function (res) {
+          if (res && res[key]) finish(res[key].images);
+        });
+      }, 500);
+      var timeout = setTimeout(function () { finish(null); }, 22000);
     });
   }
 
@@ -109,29 +164,19 @@
     });
   }
 
-  async function openPanel(widget, post, btn) {
-    var old = widget.querySelector('.ppf-panel');
-    if (old) { old.remove(); return; }
-    var panel = document.createElement('div');
-    panel.className = 'ppf-panel';
-    panel.innerHTML = '<div class="ppf-head">PostPocket · loading full set…</div><div class="ppf-grid"></div>';
-    widget.appendChild(panel);
-
-    await expandPost(post);
+  function renderPanelBody(panel, post, btn) {
+    var oldBody = panel.querySelector('.ppf-body');
+    if (oldBody) oldBody.remove();
+    var body = document.createElement('div');
+    body.className = 'ppf-body';
     panel.querySelector('.ppf-head').textContent = 'PostPocket · ' + post.images.length + ' images';
 
     var actions = document.createElement('div');
     actions.className = 'ppf-row';
     actions.innerHTML = '<button class="primary" data-all>Download all</button><button data-single>Single image</button>';
-    panel.insertBefore(actions, panel.querySelector('.ppf-grid'));
-    var note = document.createElement('div');
-    note.className = 'ppf-note';
-    note.textContent = post.extraCount
-      ? 'Hidden photos open a visible Facebook tab (you can close it anytime). Only images in your session are saved.'
-      : 'Only images already visible in your session. One post at a time, gently downloaded.';
-    panel.appendChild(note);
-
-    var grid = panel.querySelector('.ppf-grid');
+    body.appendChild(actions);
+    var grid = document.createElement('div');
+    grid.className = 'ppf-grid';
     post.images.forEach(function (im, i) {
       var b = document.createElement('button');
       b.title = 'Save image ' + (i + 1);
@@ -145,6 +190,15 @@
       b.addEventListener('click', function () { collect(post, [i], btn); });
       grid.appendChild(b);
     });
+    body.appendChild(grid);
+    var note = document.createElement('div');
+    note.className = 'ppf-note';
+    note.textContent = post.extraCount && !post.expanded
+      ? 'Hidden photos open a visible Facebook tab (you can close it anytime). Only images in your session are saved.'
+      : 'Only images already visible in your session. One post at a time, gently downloaded.';
+    body.appendChild(note);
+    panel.appendChild(body);
+
     actions.querySelector('[data-all]').addEventListener('click', function () {
       collect(post, post.images.map(function (_, i) { return i; }), btn);
     });
@@ -155,7 +209,38 @@
     btn.querySelector('b').textContent = String(post.images.length);
   }
 
+  async function openPanel(widget, post, btn) {
+    var old = widget.querySelector('.ppf-panel');
+    if (old) { old.remove(); return; }
+    var panel = document.createElement('div');
+    panel.className = 'ppf-panel';
+    panel.innerHTML = '<div class="ppf-head">PostPocket · ' + post.images.length + ' images</div>';
+    widget.appendChild(panel);
+
+    if (post.extraCount && !post.expanded && post.expandHref) {
+      var openRow = document.createElement('div');
+      openRow.className = 'ppf-row';
+      openRow.innerHTML = '<button class="primary" data-viewer>Open photo viewer (' + post.extraCount + ' more)</button>';
+      panel.appendChild(openRow);
+      var hint = document.createElement('div');
+      hint.className = 'ppf-note';
+      hint.textContent = 'Opens a visible Facebook tab. Close it whenever you like — we read the images from that tab only.';
+      panel.appendChild(hint);
+      openRow.querySelector('[data-viewer]').addEventListener('click', async function (e) {
+        e.stopPropagation();
+        var b = e.currentTarget;
+        b.disabled = true; b.textContent = 'Opening viewer…';
+        await expandPost(post);
+        openRow.remove(); hint.remove();
+        renderPanelBody(panel, post, btn);
+      });
+      return;
+    }
+    renderPanelBody(panel, post, btn);
+  }
+
   function decorate() {
+    if (viewerMatch) return; // don't clutter the photo viewer with our widget
     if (!S || !S.findPostContainers) return;
     ensureStyle();
     var containers = S.findPostContainers(document);
