@@ -7,24 +7,28 @@
   async function ensureOffscreen() {
     if (creating) return creating;
     creating = (async function () {
-      try {
-        var contexts = await chrome.runtime.getContexts({ contextTypes: ['OFFSCREEN_DOCUMENT'] });
-        if (contexts && contexts.length) return;
-      } catch (e) { /* older Chrome: try creating and ignore duplicate error */ }
+      // Create directly; a duplicate-document error simply means it already
+      // exists. Avoids runtime.getContexts, which can fail with "No SW" during
+      // a service-worker reload.
       try {
         await chrome.offscreen.createDocument({
           url: 'src/background/offscreen.html',
           reasons: ['BLOBS'],
           justification: 'Create short-lived object URLs for saving images and building ZIP archives on this device.'
         });
-      } catch (e) { /* already exists */ }
+      } catch (e) { /* document already exists */ }
     })();
     try { await creating; } finally { creating = null; }
   }
 
   async function ask(msg) {
     await ensureOffscreen();
-    return chrome.runtime.sendMessage(msg);
+    try {
+      return await chrome.runtime.sendMessage(msg);
+    } catch (e) {
+      // Service worker can be torn down mid-request (e.g. during reload).
+      return { ok: false, error: String((e && e.message) || e) };
+    }
   }
 
   global.PPBlob = {

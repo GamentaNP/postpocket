@@ -60,7 +60,7 @@ export default function PopupView({ onOpenDashboard, onOpenSidePanel }: { onOpen
       {posts.length > 1 && (
         <div className="card" style={{ padding: 10 }}>
           <div className="path-label" style={{ marginBottom: 6 }}>{posts.length} posts on this page — choose one</div>
-          <div className="btn-row">
+          <div className="popup-chips">
             {posts.map((p, i) => (
               <button key={p.id} className={`btn ${i === active ? 'primary' : 'quiet'} sm`} onClick={() => choose(i)}>
                 {p.sourceName.slice(0, 12)} · {p.images.length}
@@ -70,36 +70,38 @@ export default function PopupView({ onOpenDashboard, onOpenSidePanel }: { onOpen
         </div>
       )}
 
-      <div className="card">
-        <div className="card-head">
-          <h3>Current post</h3>
-          <button className="btn quiet sm" disabled={busy} onClick={scan}>{busy ? 'Scanning…' : 'Scan again'}</button>
-        </div>
-        {post ? <>
-          <div className="source-top"><span className="badge">{post.sourceType}</span><span className="scan-state">Post captured</span></div>
-          <h2 style={{ fontFamily: 'var(--serif)', fontSize: 17, margin: '7px 0 3px' }}>{post.sourceName}</h2>
-          <p className="title-line">{post.title}</p>
-          <div className="meta-grid" style={{ gridTemplateColumns: '1fr 1fr', marginBottom: 8 }}>
-            <div><span>Author</span><strong>{post.author}</strong></div><div><span>Posted</span><strong>{post.date}</strong></div>
+      <div className="popup-columns">
+        <div>
+          <div className="card">
+            <div className="card-head">
+              <h3>Current post</h3>
+              <button className="btn quiet sm" disabled={busy} onClick={scan}>{busy ? 'Scanning…' : 'Scan again'}</button>
+            </div>
+            {post ? <>
+              <div className="source-top"><span className="badge">{post.sourceType}</span><span className="scan-state">Post captured</span></div>
+              <h2 style={{ fontFamily: 'var(--serif)', fontSize: 17, margin: '7px 0 3px' }}>{post.sourceName}</h2>
+              <p className="title-line">{post.title}</p>
+              <div className="meta-grid" style={{ gridTemplateColumns: '1fr 1fr', marginBottom: 8 }}>
+                <div><span>Author</span><strong>{post.author}</strong></div><div><span>Posted</span><strong>{post.date}</strong></div>
+              </div>
+            </> : <div style={{ color: 'var(--muted)', fontSize: 12 }}>{busy ? 'Scanning this page…' : 'No post captured.'}</div>}
           </div>
-        </> : <div style={{ color: 'var(--muted)', fontSize: 12 }}>{busy ? 'Scanning this page…' : 'No post captured.'}</div>}
-      </div>
-
-      {!!post?.extraCount && (
-        <div className="notice warn" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-          <span>{post.extraCount} more photos hidden behind “+{post.extraCount}”.</span>
-          <button className="btn ghost sm" onClick={expand}>Load all</button>
+          {!!post?.extraCount && (
+            <div className="notice warn" style={{ marginTop: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+              <span>{post.extraCount} more photos hidden behind “+{post.extraCount}”.</span>
+              <button className="btn ghost sm" onClick={expand}>Load all</button>
+            </div>
+          )}
         </div>
-      )}
-
-      <div className="card">
-        <div className="card-head"><h3>Images</h3><span className="scan-state">{post ? `${selected.size} / ${post.images.length} selected` : '—'}</span></div>
-        {post ? <ThumbGrid images={post.images} selected={selected} size="small" onToggle={(i) => {
-          const next = new Set(selected); next.has(i) ? next.delete(i) : next.add(i); setSelected(next)
-        }} /> : <div className="grid-empty">No images yet.</div>}
-        <div className="btn-row" style={{ marginTop: 12 }}>
-          <button className="btn primary" style={{ flex: 1 }} disabled={!post || !selected.size} onClick={save}>Save selected</button>
-          <button className="btn ghost" onClick={onOpenSidePanel}>Side panel</button>
+        <div className="card">
+          <div className="card-head"><h3>Images</h3><span className="scan-state">{post ? `${selected.size} / ${post.images.length} selected` : '—'}</span></div>
+          {post ? <ThumbGrid images={post.images} selected={selected} size="small" onToggle={(i) => {
+            const next = new Set(selected); next.has(i) ? next.delete(i) : next.add(i); setSelected(next)
+          }} /> : <div className="grid-empty">No images yet.</div>}
+          <div className="btn-row" style={{ marginTop: 12 }}>
+            <button className="btn primary" style={{ flex: 1 }} disabled={!post || !selected.size} onClick={save}>Save selected</button>
+            <button className="btn ghost" onClick={onOpenSidePanel}>Side panel</button>
+          </div>
         </div>
       </div>
       <div className="foot">Auto-scans the page when opened — never auto-downloads. Everything stays on this device.</div>
