@@ -8,6 +8,14 @@ Compiled from 10 parallel research agents (competitor matrix, Chrome/Meta policy
 
 We lead the category on the things competitors get wrong: per-post floating widget, `+N` expansion, local-first library, naming templates, ZIP/CSV/JSON export, no signup, no caps, no review gates, monochrome UI. The market's #1 complaint is carousel/multi-image failure; our wedge is exactly that.
 
+### Honest feature audit (vs. full spec)
+
+- ✅ ~45 features implemented, 🟡 ~35 partial, ❌ ~25 missing.
+- **16 settings are cosmetic** — stored and shown in the UI but never read by the worker (`destination`, `quality`, `formats`, `quantity`, `dateFilter`, `existingFiles`, `imageOrder`, `duplicateMode`, `previewMode`, `gridSize`, `concurrency`, `saveMetadata`, `metaDate`, `metaPostId`, `folderHandleName`…). This is worse than a missing feature: users believe options work.
+- **3 of 6 collection methods are stubs**: post URL queue, archive import, local files/folder/ZIP import. `PPZip.readZip` and `SourceCard` are implemented but unreachable.
+- Store listing currently overclaims those stubs — must fix before launch.
+- Remaining effort to full spec parity: **~40–60 dev-days** (excluding approval-dependent Meta connector).
+
 But there are **five P0 blockers** before any store submission:
 
 1. **Chrome policy risk:** the background-tab photo viewer is hidden functionality and likely a rejection/takedown item.
@@ -101,6 +109,7 @@ Ranked by market demand (from competitor review analysis):
 
 ## 6. Suggested next sprint (in order)
 
+0. **Honesty pass:** either wire or hide the 16 dead settings; fix store-listing overclaims; make the 3 stub collection methods real or remove them from the UI.
 1. P0-2 permissions trim + P0-5 consent/privacy page (cheap, unblocks review).
 2. P0-1 viewer disclosure/visible-tab rewrite **or** commit to archive-import-only positioning — **needs your decision**.
 3. P0-3 offscreen blob URLs + P0-4 resume cursor.

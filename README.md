@@ -52,7 +52,7 @@ Then:
 
 **Fastest:** on a Facebook post, click the floating `⬇ N` icon → **Download all** or **Single image** → click a thumbnail.
 
-**From the popup:** click the toolbar icon → **Scan this post** → select thumbnails → **Save selected**. (No auto-scan by design.)
+**From the popup:** click the toolbar icon — it auto-scans the page and shows any posts with images; pick one, select thumbnails, then **Save selected**. Nothing downloads automatically.
 
 **Full workspace:** the popup's `↗` button opens the dashboard with Collect, Library, Queue, Settings and About.
 
