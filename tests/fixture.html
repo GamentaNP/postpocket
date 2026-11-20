@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>PostSaver scanner fixture</title>
+  <style>
+    body { font: 13px system-ui; background: #10151d; color: #dce3ee; padding: 18px; }
+    .post { border: 1px solid #2c384a; border-radius: 10px; padding: 14px; max-width: 620px; margin-bottom: 18px; }
+    .head { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; }
+    .avatar { width: 50px; height: 50px; border-radius: 50%; }
+    .photos { display: flex; flex-wrap: wrap; gap: 6px; }
+    .photos img { width: 150px; height: 110px; object-fit: cover; background: #263143; }
+    pre { white-space: pre-wrap; word-break: break-all; color: #8ee0b0; }
+  </style>
+</head>
+<body>
+  <h2>Mock Facebook post (scanner input)</h2>
+
+  <div data-testid="post" id="feed_post_523184709912347" class="post">
+    <div class="head">
+      <img class="avatar" src="https://scontent.xx.fbcdn.net/v/t1.0-1/p50x50/avatar.jpg" width="50" height="50" alt="avatar">
+      <div>
+        <a href="/groups/987654321/" class="group-link">Lok Sewa Exam Preparation</a><br>
+        <a href="/profile.php?id=555" role="link" tabindex="0" class="author">Suman Shrestha</a>
+        <a href="/home.php">Home</a>
+        <abbr data-utime="1794960000" title="Nov 18, 2026 at 10:00 AM">2d</abbr>
+      </div>
+    </div>
+
+    <div data-testid="post_message" dir="auto">
+      Old question set — subjective questions from the 2078 Lok Sewa exam with model answers.
+      Download and revise before the exam.
+    </div>
+
+    <div class="photos">
+      <a href="https://www.facebook.com/groups/987654321/posts/523184709912347/?fbid=111">
+        <img
+          src="https://scontent.xx.fbcdn.net/v/t1.0-0/p480x480/a.jpg?stp=dst-jpg_p480x480"
+          srcset="https://scontent.xx.fbcdn.net/v/t1.0-0/p480x480/a.jpg?stp=dst-jpg_p480x480 480w, https://scontent.xx.fbcdn.net/v/t1.0-0/p2048x2048/a.jpg?stp=dst-jpg_p2048x2048 2048w"
+          width="480" height="360" alt="question 1">
+      </a>
+      <img data-src="https://scontent.xx.fbcdn.net/v/t1.0-0/p960x960/b.jpg?stp=dst-jpg_p960x960" width="900" height="700" alt="question 2">
+      <img data-full-src="https://scontent.xx.fbcdn.net/v/t1.0-0/c.png?stp=dst-png_p1200x1200" width="1200" height="900" alt="question 3">
+      <button aria-label="Like"><img src="https://scontent.xx.fbcdn.net/v/t1.0-1/p32x32/heart.png" width="20" height="20" alt="like icon"></button>
+    </div>
+  </div>
+
+  <h2>scanPost() output</h2>
+  <pre id="result">waiting…</pre>
+
+  <script src="../src/shared/utils.js"></script>
+  <script src="../src/shared/scanner.js"></script>
+  <script>
+    window.addEventListener('load', function () {
+      var url = 'https://www.facebook.com/groups/987654321/posts/523184709912347/';
+      try {
+        var res = window.FBPostScanner.scanPost(document, url, { w: 1200, h: 900 });
+        window.__result = res;
+        document.getElementById('result').textContent = JSON.stringify(res, null, 2);
+      } catch (e) {
+        window.__result = { error: String(e && e.stack || e) };
+        document.getElementById('result').textContent = window.__result.error;
+      }
+    });
+  </script>
+</body>
+</html>

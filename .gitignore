@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# OS junk
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor / tooling caches
+.vscode/
+.idea/
+*.swp
+*.swo
+.cache/
+.eslintcache
+
+# Playwright / test artifacts
+test-results/
+playwright-report/
+coverage/
+
+# NOTE: dist/ is intentionally COMMITTED.
+# The unpacked extension loads the built React pages from dist/,
+# so users must not have to run a build before loading it.
