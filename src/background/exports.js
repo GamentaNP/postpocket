@@ -1,62 +1,53 @@
-/* PostPocket — export engine: one ZIP, per-post ZIP, folders, CSV/JSON. */
+/* PostPocket — export engine: one ZIP, per-post ZIP, folders, CSV/JSON, backup. */
 (function (global) {
   'use strict';
   var U = global.FBPUtils;
   var Naming = global.PPNaming;
   var DB = global.PPDB;
-  var Zip = global.PPZip;
 
-  async function getBytes(post, index, img) {
-    var blob = await DB.getBlob((post.jobId || 'manual') + ':' + post.id + ':' + index);
-    if (blob) return new Uint8Array(await blob.arrayBuffer());
-    try {
-      var res = await fetch(img.url, { credentials: 'include' });
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      return new Uint8Array(await (await res.blob()).arrayBuffer());
-    } catch (e) {
-      if (img.alternates && img.alternates.length) {
-        for (var i = 0; i < img.alternates.length; i++) {
-          try {
-            var r2 = await fetch(img.alternates[i], { credentials: 'include' });
-            if (r2.ok) return new Uint8Array(await (await r2.blob()).arrayBuffer());
-          } catch (e2) {}
-        }
-      }
-      throw new Error('Image unavailable');
+  function storedKey(post, index) { return (post.jobId || 'manual') + ':' + post.id + ':' + index; }
+
+  async function blobForImage(post, index, img) {
+    var blob = await DB.getBlob(storedKey(post, index));
+    if (blob) return blob;
+    var urls = [img.url].concat(img.alternates || []);
+    for (var i = 0; i < urls.length; i++) {
+      try {
+        var res = await fetch(urls[i], { credentials: 'include', signal: AbortSignal.timeout(15000) });
+        if (res.ok) return await res.blob();
+      } catch (e) {}
     }
+    return null;
   }
 
   async function downloadBlob(blob, filename) {
-    // data: URLs are supported by chrome.downloads in MV3 service workers;
-    // blob: URLs created in a service worker are not reliably downloadable.
-    var url = await U.blobToDataUrl(blob);
-    return new Promise(function (resolve) {
-      chrome.downloads.download({ url: url, filename: filename, conflictAction: 'uniquify', saveAs: false }, function (id) {
+    var key = 'tmp:' + U.uid('exp');
+    var prepared = await PPBlob.urlForBlob(blob, key);
+    if (!prepared.ok) return { ok: false, error: prepared.error };
+    var out = await new Promise(function (resolve) {
+      chrome.downloads.download({ url: prepared.url, filename: filename, conflictAction: 'uniquify', saveAs: false }, function (id) {
         resolve({ ok: !chrome.runtime.lastError && !!id, id: id, filename: filename, error: chrome.runtime.lastError && chrome.runtime.lastError.message });
       });
     });
+    await PPBlob.revoke(prepared.url, key);
+    return out;
   }
 
   function metaFiles(post, settings, folder) {
-    var out = [];
-    var s = settings || {};
-    if (s.metaSidecar !== false) {
-      out.push({
-        name: folder + '/post-info.json',
-        data: JSON.stringify({
-          title: post.title, postId: post.postId, sourceType: post.sourceType,
-          sourceName: post.sourceName, author: post.author, date: post.date,
-          postUrl: s.metaSourceLink === false ? undefined : post.postUrl,
-          text: s.metaCaption === false ? undefined : post.text,
-          images: post.images.map(function (im, i) { return { index: i + 1, url: im.url, savedAs: Naming.imageName(post, i + 1, im.ext, s) }; })
-        }, null, 2)
-      });
-    }
+    var out = [], s = settings || {};
+    if (s.saveMetadata === false || s.metaSidecar === false) return out;
+    var info = {
+      title: post.title, postId: post.postId, sourceType: post.sourceType,
+      sourceName: post.sourceName, author: post.author,
+      text: s.metaCaption === false ? undefined : post.text,
+      images: post.images.map(function (im, i) { return { index: i + 1, url: im.url, savedAs: Naming.imageName(post, i + 1, im.ext, s) }; })
+    };
+    if (s.metaDate !== false) info.date = post.date;
+    if (s.metaPostId !== false) info.postId = post.postId;
+    if (s.metaSourceLink !== false) info.postUrl = post.postUrl;
+    out.push({ name: folder + '/post-info.json', text: JSON.stringify(info, null, 2), mime: 'application/json' });
     if (s.metaReadme) {
-      out.push({
-        name: folder + '/README.txt',
-        data: 'PostPocket collection\n\n' + post.title + '\n\nSource: ' + post.sourceName + ' (' + post.sourceType + ')\nAuthor: ' + post.author + '\nDate: ' + post.date + '\nPost ID: ' + post.postId + '\nLink: ' + post.postUrl + '\n\n' + (post.text || '')
-      });
+      out.push({ name: folder + '/README.txt', text: 'PostPocket collection\n\n' + post.title + '\n\nSource: ' + post.sourceName + ' (' + post.sourceType + ')\nAuthor: ' + post.author + '\nDate: ' + post.date + '\nPost ID: ' + post.postId + '\nLink: ' + post.postUrl + '\n\n' + (post.text || '') });
     }
     return out;
   }
@@ -70,68 +61,76 @@
     return lines.join('\r\n');
   }
 
+  async function buildEntries(posts, settings, flat) {
+    var entries = [], tempKeys = [];
+    for (var i = 0; i < posts.length; i++) {
+      var post = posts[i];
+      var folder = flat ? '' : Naming.destination(post, settings);
+      for (var j = 0; j < (post.images || []).length; j++) {
+        var img = post.images[j];
+        var blob = await blobForImage(post, j, img);
+        if (!blob) continue;
+        var key = 'tmp:' + U.uid('zip');
+        await DB.putBlob(key, blob);
+        tempKeys.push(key);
+        entries.push({ name: (folder ? folder + '/' : '') + Naming.imageName(post, j + 1, img.ext, settings), blobKey: key });
+      }
+      metaFiles(post, settings, folder || '.').forEach(function (f) { entries.push(f); });
+    }
+    if (settings.metaCsv) entries.push({ name: (settings.rootFolder || 'PostPocket') + '/post-index.csv', text: csvFor(posts), mime: 'text/csv' });
+    return { entries: entries, tempKeys: tempKeys };
+  }
+
+  async function downloadZip(entries, tempKeys, filename) {
+    var built = await PPBlob.buildZipUrl(entries);
+    if (!built.ok) return { ok: false, error: built.error };
+    var out = await new Promise(function (resolve) {
+      chrome.downloads.download({ url: built.url, filename: filename, conflictAction: 'uniquify', saveAs: false }, function (id) {
+        resolve({ ok: !chrome.runtime.lastError && !!id, id: id, filename: filename, error: chrome.runtime.lastError && chrome.runtime.lastError.message });
+      });
+    });
+    await PPBlob.revoke(built.url);
+    for (var i = 0; i < tempKeys.length; i++) { try { await DB.deleteBlob(tempKeys[i]); } catch (e) {} }
+    return out;
+  }
+
   var Exports = {
     oneZip: async function (posts, settings, name) {
-      var entries = [];
-      for (var i = 0; i < posts.length; i++) {
-        var post = posts[i];
-        var folder = Naming.destination(post, settings);
-        for (var j = 0; j < (post.images || []).length; j++) {
-          var img = post.images[j];
-          var bytes = await getBytes(post, j, img);
-          entries.push({ name: folder + '/' + Naming.imageName(post, j + 1, img.ext, settings), data: bytes });
-        }
-        metaFiles(post, settings, folder).forEach(function (f) { entries.push(f); });
-      }
-      if (settings.metaCsv) entries.push({ name: (settings.rootFolder || 'PostPocket') + '/post-index.csv', data: csvFor(posts) });
-      var blob = Zip.createZip(entries);
-      return downloadBlob(blob, U.sanitizeSegment(name || 'PostPocket-collection', 80) + '.zip');
+      var built = await buildEntries(posts, settings, false);
+      return downloadZip(built.entries, built.tempKeys, U.sanitizeSegment(name || 'PostPocket-collection', 80) + '.zip');
     },
 
     perPostZip: async function (posts, settings) {
       var results = [];
       for (var i = 0; i < posts.length; i++) {
-        var post = posts[i];
-        var folder = Naming.destination(post, settings);
-        var entries = [];
-        for (var j = 0; j < (post.images || []).length; j++) {
-          var img = post.images[j];
-          var bytes = await getBytes(post, j, img);
-          entries.push({ name: Naming.imageName(post, j + 1, img.ext, settings), data: bytes });
-        }
-        metaFiles(post, settings, '.').forEach(function (f) { entries.push(f); });
-        results.push(await downloadBlob(Zip.createZip(entries), U.sanitizeSegment(Naming.folderName(post, settings), 80) + '.zip'));
+        var built = await buildEntries([posts[i]], settings, true);
+        results.push(await downloadZip(built.entries, built.tempKeys, U.sanitizeSegment(Naming.folderName(posts[i], settings), 80) + '.zip'));
       }
       return results;
     },
 
     folders: async function (posts, settings) {
       var results = [];
-      var saved = await DB.allJobs();
       for (var i = 0; i < posts.length; i++) {
         var post = posts[i];
         var folder = Naming.destination(post, settings);
         for (var j = 0; j < (post.images || []).length; j++) {
-          var img = post.images[j];
-          var blob = await DB.getBlob((post.jobId || 'manual') + ':' + post.id + ':' + j);
-          if (!blob) {
-            try { blob = await (await fetch(img.url, { credentials: 'include' })).blob(); } catch (e) { continue; }
-          }
-          var url = await U.blobToDataUrl(blob);
+          var blob = await blobForImage(post, j, post.images[j]);
+          if (!blob) continue;
+          var key = 'tmp:' + U.uid('folder');
+          var prepared = await PPBlob.urlForBlob(blob, key);
+          if (!prepared.ok) continue;
           results.push(await new Promise(function (resolve) {
-            chrome.downloads.download({ url: url, filename: folder + '/' + Naming.imageName(post, j + 1, img.ext, settings), conflictAction: 'uniquify', saveAs: false }, function (id) {
+            chrome.downloads.download({ url: prepared.url, filename: folder + '/' + Naming.imageName(post, j + 1, post.images[j].ext, settings), conflictAction: 'uniquify', saveAs: false }, function (id) {
               resolve({ ok: !chrome.runtime.lastError && !!id, id: id });
             });
           }));
+          await PPBlob.revoke(prepared.url, key);
         }
-        for (var k = 0; k < metaFiles(post, settings, folder).length; k++) {
-          var f = metaFiles(post, settings, folder)[k];
-          await downloadBlob(new Blob([f.data], { type: 'text/plain' }), f.name);
-        }
+        var metas = metaFiles(post, settings, folder);
+        for (var k = 0; k < metas.length; k++) await downloadBlob(new Blob([metas[k].text], { type: metas[k].mime || 'text/plain' }), metas[k].name);
       }
-      if (settings.metaCsv) {
-        await downloadBlob(new Blob([csvFor(posts)], { type: 'text/csv' }), (settings.rootFolder || 'PostPocket') + '/post-index.csv');
-      }
+      if (settings.metaCsv) await downloadBlob(new Blob([csvFor(posts)], { type: 'text/csv' }), (settings.rootFolder || 'PostPocket') + '/post-index.csv');
       return results;
     },
 

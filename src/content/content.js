@@ -126,7 +126,9 @@
     panel.insertBefore(actions, panel.querySelector('.ppf-grid'));
     var note = document.createElement('div');
     note.className = 'ppf-note';
-    note.textContent = 'Only images already visible in your session. One post at a time, gently downloaded.';
+    note.textContent = post.extraCount
+      ? 'Hidden photos open a visible Facebook tab (you can close it anytime). Only images in your session are saved.'
+      : 'Only images already visible in your session. One post at a time, gently downloaded.';
     panel.appendChild(note);
 
     var grid = panel.querySelector('.ppf-grid');

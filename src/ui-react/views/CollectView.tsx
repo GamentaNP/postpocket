@@ -23,7 +23,27 @@ export default function CollectView({ settings, onOpenDashboard, initialMethod =
     setBusy(false)
     if (!res.ok) { toast(res.error || 'Scan failed', 'error'); return }
     const data = Array.isArray(res.data) ? res.data : [res.data]
-    const found = (data as Post[]).filter((p) => p && p.found && p.images?.length)
+    let found = (data as Post[]).filter((p) => p && p.found && p.images?.length)
+    if (settings.dateFilter && settings.dateFilter !== 'all') {
+      const now = Date.now()
+      found = found.filter((p) => {
+        const d = new Date(p.date || '').getTime()
+        if (isNaN(d)) return true
+        const days = (now - d) / 86400000
+        if (settings.dateFilter === 'today') return days <= 1
+        if (settings.dateFilter === 'week') return days <= 7
+        if (settings.dateFilter === 'month') return days <= 31
+        if (settings.dateFilter === 'year') return days <= 365
+        return true
+      })
+    }
+    found = found.map((p) => {
+      let images = p.images.filter((im) => !settings.formats?.length || settings.formats.includes(im.ext || 'jpg'))
+      if (settings.imageOrder === 'filename') images = images.slice().sort((a, b) => String(a.name || a.url).localeCompare(String(b.name || b.url)))
+      if (settings.imageOrder === 'date') images = images.slice().sort((a, b) => (b.width || 0) - (a.width || 0))
+      if (settings.quantity !== 'all') images = images.slice(0, Number(settings.quantityValue) || 25)
+      return { ...p, images }
+    }).filter((p) => p.images.length)
     if (!found.length) { toast('No post images found. Open a post permalink and try again.', 'warn'); return }
     setPosts(found)
     setSelected(new Set(found.map((p) => p.id)))
@@ -31,6 +51,17 @@ export default function CollectView({ settings, onOpenDashboard, initialMethod =
     found.forEach((p) => { next[p.id] = new Set(p.images.map((_, i) => i)) })
     setImageSelection(next)
     toast(`Captured ${found.length} post(s)`)
+  }
+
+  async function resolveUrl(post: Post) {
+    if (!post.postUrl) return
+    toast('Opening the photo viewer in a visible tab…')
+    const r = await api.expandPost(post.postUrl)
+    if (!r.ok || !r.data?.length) { toast(r.error || 'Could not resolve this link', 'error'); return }
+    const next = posts.map((p) => p.id === post.id ? { ...p, images: r.data } : p)
+    setPosts(next)
+    setImageSelection((sel) => ({ ...sel, [post.id]: new Set(r.data.map((_: any, i: number) => i)) }))
+    toast(`Resolved ${r.data.length} images — close the viewer tab when done`)
   }
 
   function togglePost(id: string) {
@@ -55,20 +86,61 @@ export default function CollectView({ settings, onOpenDashboard, initialMethod =
     const res = await api.collect(payload, { folderTemplate, imageTemplate })
     if (!res.ok) { toast(res.error || 'Could not start', 'error'); return }
     toast(`Started — ${res.job?.total ?? totalSelected} image(s) queued`)
+    if (settings.previewMode === 'sidepanel') {
+      const tabs = await new Promise<any[]>((resolve) => chrome.tabs.query({ active: true, currentWindow: true }, resolve))
+      await api.openSidePanel(tabs[0]?.id)
+    } else if (settings.previewMode === 'newtab') {
+      await api.openDashboard()
+    }
   }
 
-  function handleFiles(files: FileList | null) {
+  async function handleFiles(files: FileList | null) {
     if (!files?.length) return
-    const post: Post = {
-      id: uid('post'), postId: uid('import').slice(-10), sourceType: method === 'archive' ? 'Archive' : 'Local',
-      sourceName: method === 'archive' ? 'Facebook archive' : 'Imported files', author: 'Imported',
-      date: new Date().toISOString().slice(0, 10), title: files[0].name, text: '', postUrl: '', images: [], found: true,
+    const DB = (window as any).PPDB
+    const groups: Record<string, { name: string; blob: Blob }[]> = {}
+    const push = (group: string, name: string, blob: Blob) => { (groups[group] ||= []).push({ name, blob }) }
+
+    for (const f of Array.from(files)) {
+      if (/\.zip$/i.test(f.name)) {
+        try {
+          const entries = await (window as any).PPZip.readZip(await f.arrayBuffer())
+          entries.forEach((e: any) => {
+            if (!/\.(jpe?g|png|gif|webp|bmp)$/i.test(e.name)) return
+            const parts = e.name.split('/')
+            push(parts.length > 1 ? parts[parts.length - 2] : 'ZIP images', e.name, new Blob([e.data]))
+          })
+        } catch (e) { toast(`Could not read ${f.name}`, 'error') }
+      } else if (f.type.startsWith('image/')) {
+        const path = (f as any).webkitRelativePath || f.name
+        const group = method === 'archive' ? (path.split('/')[0] || 'Archive') : 'Imported images'
+        push(group, f.name, f)
+      }
     }
-    Array.from(files).filter((f) => f.type.startsWith('image/')).forEach((f, i) => {
-      post.images.push({ url: '', thumb: URL.createObjectURL(f), ext: f.name.split('.').pop() || 'jpg', local: true, name: f.name })
-    })
-    if (!post.images.length) { toast('Select image files', 'warn'); return }
-    setPosts([post]); setSelected(new Set([post.id])); setImageSelection({ [post.id]: new Set(post.images.map((_, i) => i)) })
+
+    const made: Post[] = []
+    for (const group of Object.keys(groups)) {
+      const post: Post = {
+        id: uid('post'), postId: uid('imp').slice(-10), sourceType: method === 'archive' ? 'Archive' : 'Local',
+        sourceName: method === 'archive' ? (group || 'Facebook archive') : 'Imported files', author: 'Imported',
+        date: new Date().toISOString().slice(0, 10), title: group, text: '', postUrl: '', images: [], found: true,
+      }
+      for (let i = 0; i < groups[group].length; i++) {
+        const item = groups[group][i]
+        const key = 'import:' + post.id + ':' + i
+        if (DB) await DB.putBlob(key, item.blob)
+        post.images.push({
+          url: '', thumb: URL.createObjectURL(item.blob), ext: item.name.split('.').pop() || 'jpg',
+          local: true, importKey: key, name: item.name,
+        })
+      }
+      made.push(post)
+    }
+    if (!made.length) { toast('No images found in those files', 'warn'); return }
+    setPosts(made); setSelected(new Set(made.map((p) => p.id)))
+    const next: Record<string, Set<number>> = {}
+    made.forEach((p) => { next[p.id] = new Set(p.images.map((_, i) => i)) })
+    setImageSelection(next)
+    toast(`${made.length} post folder(s) imported`)
   }
 
   return (
@@ -129,6 +201,8 @@ export default function CollectView({ settings, onOpenDashboard, initialMethod =
                 {imageSrc(p.images[0]) ? <img className="thumb-mini" src={imageSrc(p.images[0])} alt="" /> : <div className="thumb-mini" />}
                 <div className="grow"><div className="t">{p.title}</div><div className="m">{p.sourceType} · {p.sourceName} · {p.images.length} image(s)</div></div>
                 <label className="check-row" style={{ margin: 0 }}><input type="checkbox" checked={selectedPosts.has(p.id)} onChange={() => togglePost(p.id)} /></label>
+                {!p.images.length && p.postUrl && <button className="btn ghost sm" onClick={() => resolveUrl(p)}>Resolve</button>}
+                {p.postUrl && <a className="btn quiet sm" href={p.postUrl} target="_blank" rel="noreferrer">Open</a>}
               </div>
             ))}
           </div>
@@ -152,7 +226,7 @@ export default function CollectView({ settings, onOpenDashboard, initialMethod =
               <div className="row" style={{ background: 'transparent', border: 'none', padding: '4px 0' }}>
                 <div className="grow"><div className="t">{p.title}</div><div className="m">{p.sourceName} · {p.images.length} images</div></div>
               </div>
-              <ThumbGrid images={p.images} selected={imageSelection[p.id] || new Set()} onToggle={(i) => toggleImage(p.id, i)} size="medium" />
+              <ThumbGrid images={p.images} selected={imageSelection[p.id] || new Set()} onToggle={(i) => toggleImage(p.id, i)} size={(settings.gridSize || 'medium') as 'small' | 'medium' | 'large'} />
             </div>
           ))}
           <div className="form-grid" style={{ marginTop: 8 }}>

@@ -8,6 +8,8 @@ No backend. No account. No analytics. No developer access to your images. No pas
 
 ---
 
+> **v2.2 — compliance path C.** Archive/folder/ZIP import is now a real, local-first workflow (headline use case). The Facebook floating widget remains a clearly manual companion. Hidden `+N` photos open a **visible** tab you can close anytime; nothing is hidden or auto-downloaded. See `docs/ROADMAP.md`.
+
 ## Highlights
 
 - **Floating download widget on every Facebook post** — one compact `⬇ N` icon. Click it for **Download all** or **Single image** (thumbnail picker). No need to open the popup.
@@ -94,6 +96,7 @@ All user-facing strings, defaults, nav items, groups and message names live in `
 ## Guidelines & safety
 
 - Reads **only** the page you are viewing. No crawling, no background indexing.
+- Local files, folders, ZIPs and Facebook data-export folders are imported and stored entirely on this device.
 - One post at a time, started manually. Downloads are sequential and gently staggered.
 - Uses your normal browser session; never asks for a password, cookie, token or login code.
 - Does not include the `chrome.cookies` permission and has no stealth/anti-detection code. The `scripting` permission is used only to read the photo viewer you explicitly open via the `+N` tile.

@@ -3,7 +3,8 @@ import { api } from './lib/api'
 import { toast } from './lib/toast'
 import { applyTheme } from './lib/theme'
 import { APP, NAV_ITEMS } from './lib/config'
-import { Masthead, Sidebar, Toaster } from './components'
+import { Masthead, Modal, Sidebar, Toaster } from './components'
+import { getConsent, acceptConsent } from './lib/consent'
 import OverviewView from './views/OverviewView'
 import CollectView from './views/CollectView'
 import LibraryView from './views/LibraryView'
@@ -18,6 +19,7 @@ export default function App({ mode }: { mode: UIMode }) {
   const [settings, setSettings] = useState<Settings | null>(null)
   const [collectMethod, setCollectMethod] = useState('single')
   const [counts, setCounts] = useState<Record<string, number>>({})
+  const [consented, setConsented] = useState(true)
 
   async function refresh() {
     const s = await api.settings(); setSettings(s.data as Settings || null); applyTheme((s.data as Settings)?.theme)
@@ -28,7 +30,10 @@ export default function App({ mode }: { mode: UIMode }) {
     })
   }
 
-  useEffect(() => { refresh() }, [])
+  useEffect(() => {
+    refresh()
+    if (mode !== 'popup') getConsent().then(setConsented)
+  }, [])
   useEffect(() => {
     const handler = (msg: any) => { if (msg?.type === 'PP_JOB_UPDATE') refresh() }
     ;(chrome as any)?.runtime?.onMessage?.addListener?.(handler)
@@ -69,7 +74,24 @@ export default function App({ mode }: { mode: UIMode }) {
     )
   }
 
-  return <div className="shell">{content}<Toaster /></div>
+  return <div className="shell">
+    {content}
+    {!consented && mode !== 'popup' && (
+      <Modal title="Before you start" onClose={() => {}} footer={
+        <button className="btn primary" onClick={async () => { await acceptConsent(); setConsented(true) }}>I understand</button>
+      }>
+        <p style={{ color: 'var(--muted)' }}>
+          PostPocket reads only the Facebook post you choose and saves images to this device. Nothing is uploaded,
+          no account is required, and no password, cookie or token is ever requested. Your library stays in this
+          browser until you delete it.
+        </p>
+        <p style={{ color: 'var(--muted)', fontSize: 11 }}>
+          Hidden photos in a post open a <strong>visible</strong> Facebook tab that you can close at any time.
+        </p>
+      </Modal>
+    )}
+    <Toaster />
+  </div>
 }
 
 function ContentView({ view, shared, navigate, method }: {

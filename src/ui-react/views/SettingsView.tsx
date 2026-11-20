@@ -45,9 +45,7 @@ export default function SettingsView() {
 
   if (group === 'download') body = <>
     <div className="form-grid">
-      {field('Save images to', select('destination', [['downloads', 'Chrome Downloads / PostPocket'], ['folder', 'My selected permanent folder'], ['ask', 'Ask me every time'], ['zip', 'ZIP export only']]))}
-      {field('Root folder', input('rootFolder'))}
-      {field('Image quality', select('quality', [['largest', 'Largest available'], ['original', 'Original source where available'], ['smaller', 'Smaller files']]))}
+      {field('Root folder (inside Downloads)', input('rootFolder'))}
       {field('Download quantity', select('quantity', [['all', 'All selected'], ['latest', 'Latest N'], ['custom', 'Custom count']]))}
       {field('Custom count', input('quantityValue', 'number'))}
       {field('Date filter', select('dateFilter', [['all', 'All dates'], ['today', 'Today'], ['week', 'This week'], ['month', 'This month'], ['year', 'This year'], ['custom', 'Custom range']]))}
@@ -71,7 +69,7 @@ export default function SettingsView() {
       {field('After Collect, open', select('previewMode', [['newtab', 'New extension tab'], ['sidepanel', 'Chrome side panel'], ['inline', 'Inline preview'], ['ask', 'Ask every time']]))}
       {field('Grid size', select('gridSize', [['small', 'Small'], ['medium', 'Medium'], ['large', 'Large']]))}
     </div>
-    {check('notifications', 'Show completion notifications')}
+    <p className="foot">Progress and results are shown in the widget, popup badge and queue — no system notification permission is used.</p>
   </>
   if (group === 'queue') body = <>
     <div className="form-grid">
@@ -83,7 +81,7 @@ export default function SettingsView() {
   </>
   if (group === 'duplicates') body = <>{field('Duplicate handling', select('duplicateMode', [['skip', 'Skip duplicates'], ['rename', 'Keep and rename'], ['review', 'Ask me']]))}<p className="foot">SHA-256 hashes are computed locally while images are saved.</p></>
   if (group === 'metadata') body = <>
-    {check('metaSidecar', 'Write post-info.json')}{check('metaCaption', 'Include post caption')}{check('metaDate', 'Include post date')}
+    {check('saveMetadata', 'Write post-info.json')}{check('metaCaption', 'Include post caption')}{check('metaDate', 'Include post date')}
     {check('metaSourceLink', 'Include original post link')}{check('metaPostId', 'Include post identifier')}
     {check('metaReadme', 'Write README.txt per post')}{check('metaCsv', 'Include post-index.csv in exports')}
   </>

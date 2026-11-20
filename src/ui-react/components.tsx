@@ -93,15 +93,21 @@ export function ConfirmDialog({ title, message, onYes, onClose }: { title: strin
 export function Lightbox({ src, caption, index, total, onNav, onClose }: {
   src: string; caption: string; index: number; total: number; onNav: (i: number) => void; onClose: () => void
 }) {
+  const [zoom, setZoom] = React.useState(1)
+  const [size, setSize] = React.useState('')
+  React.useEffect(() => { setZoom(1); setSize('') }, [src])
   return (
     <div className="modal-back" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
       <div className="modal wide" style={{ background: 'transparent', border: 'none', boxShadow: 'none' }}>
         <div className="lightbox">
-          <div className="lightbox-bar"><span>{index + 1} / {total}</span><span>{caption}</span></div>
-          <img src={src} alt="preview" />
+          <div className="lightbox-bar"><span>{index + 1} / {total}</span><span>{caption}</span>{size && <span>{size}</span>}</div>
+          <img src={src} alt={caption || 'preview'} style={{ transform: `scale(${zoom})`, maxHeight: `${78 / zoom}vh`, transition: 'transform .15s ease' }}
+            onLoad={(e) => setSize(`${(e.currentTarget as HTMLImageElement).naturalWidth} × ${(e.currentTarget as HTMLImageElement).naturalHeight}`)} />
           <div className="lightbox-bar">
             <button className="btn quiet sm" onClick={() => onNav(index - 1)}>← Previous</button>
             <button className="btn quiet sm" onClick={() => onNav(index + 1)}>Next →</button>
+            <button className="btn quiet sm" onClick={() => setZoom((z) => Math.max(1, +(z - 0.25).toFixed(2)))}>−</button>
+            <button className="btn quiet sm" onClick={() => setZoom((z) => Math.min(3, +(z + 0.25).toFixed(2)))}>+</button>
             <button className="btn quiet sm" onClick={onClose}>Close</button>
           </div>
         </div>

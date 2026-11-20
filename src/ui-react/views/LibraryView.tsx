@@ -16,6 +16,16 @@ export default function LibraryView() {
   const [preview, setPreview] = useState<{ post: Post; index: number } | null>(null)
   const [editing, setEditing] = useState<{ post: Post; kind: 'tag' | 'rename' } | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<Post | null>(null)
+  const [showDuplicates, setShowDuplicates] = useState(false)
+  const [topicFilter, setTopicFilter] = useState('all')
+  const [dateFilter, setDateFilter] = useState('all')
+  const [confirmBulk, setConfirmBulk] = useState(false)
+
+  const duplicateGroups = useMemo(() => {
+    const map = new Map<string, number>()
+    posts.forEach((p) => (p.images || []).forEach((im) => { if (im.hash) map.set(im.hash, (map.get(im.hash) || 0) + 1) }))
+    return Array.from(map.values()).filter((n) => n > 1)
+  }, [posts])
 
   async function load() { const r = await api.posts(); setPosts((r.data as Post[]) || []) }
   useEffect(() => { load() }, [])
@@ -24,13 +34,16 @@ export default function LibraryView() {
     const q = query.toLowerCase()
     return posts
       .filter((p) => showDeleted ? !!p.deleted : !p.deleted)
+      .filter((p) => !showDuplicates || (p.images || []).some((im) => im.hash && (p.images || []).filter((x) => x.hash === im.hash).length > 1))
       .filter((p) => filter === 'all' || (filter === 'fav' ? p.favorite : p.sourceType === filter))
+      .filter((p) => topicFilter === 'all' || (p.topic || 'General') === topicFilter)
+      .filter((p) => dateFilter === 'all' || String(p.date || '').startsWith(dateFilter))
       .filter((p) => !q || [p.title, p.text, p.sourceName, p.author, p.postId, (p.tags || []).join(' ')].join(' ').toLowerCase().includes(q))
       .sort((a, b) => sort === 'oldest' ? (a.date || '').localeCompare(b.date || '')
         : sort === 'name' ? (a.title || '').localeCompare(b.title || '')
         : sort === 'images' ? (b.images?.length || 0) - (a.images?.length || 0)
         : (b.savedAt || 0) - (a.savedAt || 0))
-  }, [posts, query, filter, sort, showDeleted])
+  }, [posts, query, filter, sort, showDeleted, showDuplicates, topicFilter, dateFilter])
 
   const imageCount = posts.reduce((a, p) => a + (p.images?.length || 0), 0)
   const bytes = posts.reduce((a, p) => a + (p.images || []).reduce((x, im) => x + (im.bytes || 0), 0), 0)
@@ -72,6 +85,27 @@ export default function LibraryView() {
           <select className="mini" value={sort} onChange={(e) => setSort(e.target.value)}>
             <option value="newest">Newest</option><option value="oldest">Oldest</option><option value="name">Alphabetical</option><option value="images">Most images</option>
           </select>
+          <select className="mini" value={topicFilter} onChange={(e) => setTopicFilter(e.target.value)}>
+            <option value="all">All topics</option>
+            {Array.from(new Set(posts.map((p) => p.topic || 'General'))).map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+          <select className="mini" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)}>
+            <option value="all">All dates</option>
+            {Array.from(new Set(posts.map((p) => String(p.date || '').slice(0, 7)))).filter(Boolean).map((m) => <option key={m} value={m}>{m}</option>)}
+          </select>
+          <button className="btn danger sm" disabled={!selected.size} onClick={() => setConfirmBulk(true)}>Delete selected</button>
+          <button className="btn quiet sm" onClick={() => setShowDuplicates(!showDuplicates)}>Duplicates ({duplicateGroups.length})</button>
+          {showDuplicates && <button className="btn ghost sm" onClick={async () => {
+            const seen = new Set<string>()
+            const next = posts.map((p) => ({ ...p, images: (p.images || []).filter((im) => {
+              if (!im.hash) return true
+              if (seen.has(im.hash)) return false
+              seen.add(im.hash); return true
+            }) }))
+            setPosts(next)
+            for (const p of next) await api.putPost(p)
+            toast('Duplicate images removed')
+          }}>Remove duplicates</button>}
           <button className="btn quiet sm" onClick={() => setShowDeleted(!showDeleted)}>{showDeleted ? 'Back to library' : 'Recycle bin'}</button>
         </div>
         {visible.length === 0 ? <div className="empty-state"><div className="big">▦</div><h3>Nothing here yet</h3><p>Collect a post first, or change your filters.</p></div> : (
@@ -118,6 +152,10 @@ export default function LibraryView() {
         </Modal>
       )}
       {confirmDelete && <ConfirmDialog title="Move to recycle bin?" message="You can restore it later." onClose={() => setConfirmDelete(null)} onYes={() => savePost({ ...confirmDelete, deleted: true })} />}
+      {confirmBulk && <ConfirmDialog title="Delete selected posts?" message={`${selected.size} post(s) will be moved to the recycle bin.`} onClose={() => setConfirmBulk(false)} onYes={async () => {
+        for (const p of posts.filter((x) => selected.has(x.id))) await savePost({ ...p, deleted: true })
+        setSelected(new Set()); setConfirmBulk(false)
+      }} />}
     </>
   )
 }

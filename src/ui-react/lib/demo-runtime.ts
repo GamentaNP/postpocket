@@ -35,7 +35,7 @@ export function installDemoRuntime(): boolean {
       getURL: (p: string) => p,
       lastError: null,
     },
-    storage: { local: { get: (_k: any, cb: any) => cb({}), set: (_o: any, cb?: any) => cb?.() } },
+    storage: { local: { get: (k: any, cb: any) => cb(k === 'consent' ? { consent: { accepted: true, version: 1, at: Date.now() } } : {}), set: (_o: any, cb?: any) => cb?.() } },
     tabs: { query: (_o: any, cb: any) => cb([{ id: 1, url: 'https://www.facebook.com/' }]), create: () => {} },
     sidePanel: { open: () => {} },
     downloads: {},

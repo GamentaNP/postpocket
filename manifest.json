@@ -2,14 +2,12 @@
   "manifest_version": 3,
   "name": "PostPocket — Facebook Photo Organizer",
   "short_name": "PostPocket",
-  "version": "2.1.0",
-  "description": "One post. One folder. Every image together. Organize Facebook post photos into local folders, manage a private library, and export ZIPs — all on your device.",
-  "permissions": ["downloads", "storage", "tabs", "activeTab", "notifications", "scripting"],
+  "version": "2.2.0",
+  "description": "One post. One folder. Every image together. Organize Facebook photos locally, import your own archive, and export ZIPs — all on your device.",
+  "permissions": ["downloads", "storage", "activeTab", "scripting", "offscreen", "unlimitedStorage"],
   "host_permissions": [
     "https://www.facebook.com/*",
-    "https://facebook.com/*",
-    "https://m.facebook.com/*",
-    "https://mbasic.facebook.com/*",
+    "https://*.facebook.com/*",
     "https://*.fbcdn.net/*"
   ],
   "background": {

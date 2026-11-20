@@ -30,7 +30,7 @@ PostPocket turns messy Facebook image collections into a clean, searchable libra
 Productivity / Photos
 
 ## Keywords
-facebook photo downloader, bulk image downloader, facebook post saver, image organizer, photo organizer, facebook album, local library, zip export
+facebook photo organizer, organize facebook photos, save facebook photos, facebook post images, image organizer, photo organizer, local library, zip export, naming templates
 
 ## Screenshot captions to prepare
 1. Dashboard overview — post folders, saved images, local library stats

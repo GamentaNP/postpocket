@@ -66,6 +66,12 @@
     clearPosts: async function () {
       return tx('posts', 'readwrite', function (s) { return reqPromise(s.clear()); });
     },
+    clearJobs: async function () {
+      return tx('jobs', 'readwrite', function (s) { return reqPromise(s.clear()); });
+    },
+    clearBlobs: async function () {
+      return tx('blobs', 'readwrite', function (s) { return reqPromise(s.clear()); });
+    },
 
     putJob: async function (job) {
       return tx('jobs', 'readwrite', function (s) { return reqPromise(s.put(job)); });
@@ -87,6 +93,9 @@
       var row = await tx('blobs', 'readonly', function (s) { return reqPromise(s.get(id)); });
       return row && row.blob;
     },
+    deleteBlob: async function (id) {
+      return tx('blobs', 'readwrite', function (s) { return reqPromise(s.delete(id)); });
+    },
     deleteBlobsFor: async function (postId) {
       return tx('blobs', 'readwrite', function (s) {
         var req = s.openCursor();
@@ -102,7 +111,15 @@
     exportAll: async function () {
       var posts = await DB.allPosts();
       var jobs = await DB.allJobs();
-      return JSON.stringify({ app: 'PostPocket', version: 2, exportedAt: new Date().toISOString(), posts: posts, jobs: jobs }, null, 2);
+      var settings = {};
+      try {
+        if (global.chrome && chrome.storage) {
+          settings = await new Promise(function (resolve) {
+            chrome.storage.local.get('settings', function (r) { resolve((r && r.settings) || {}); });
+          });
+        }
+      } catch (e) {}
+      return JSON.stringify({ app: 'PostPocket', version: 2, exportedAt: new Date().toISOString(), posts: posts, jobs: jobs, settings: settings }, null, 2);
     },
 
     importAll: async function (json) {
@@ -110,6 +127,9 @@
       if (!data || !Array.isArray(data.posts)) throw new Error('Invalid PostPocket backup');
       for (var i = 0; i < data.posts.length; i++) await DB.putPost(data.posts[i]);
       if (Array.isArray(data.jobs)) for (var j = 0; j < data.jobs.length; j++) await DB.putJob(data.jobs[j]);
+      if (data.settings && global.chrome && chrome.storage) {
+        await new Promise(function (resolve) { chrome.storage.local.set({ settings: data.settings }, function () { resolve(); }); });
+      }
       return { posts: data.posts.length, jobs: data.jobs.length };
     }
   };

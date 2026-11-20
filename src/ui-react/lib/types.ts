@@ -8,6 +8,7 @@ export interface PostImage {
   bytes?: number
   hash?: string
   local?: boolean
+  importKey?: string
   name?: string
   saved?: boolean
 }

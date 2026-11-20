@@ -5,6 +5,7 @@ importScripts(
   '../shared/naming.js',
   '../shared/db.js',
   '../shared/zip.js',
+  'blob-url.js',
   'queue.js',
   'exports.js'
 );
@@ -60,7 +61,13 @@ chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
   if (msg.type === 'PP_GET_POSTS') { DB.allPosts().then(function (p) { sendResponse({ ok: true, data: p }); }); return true; }
   if (msg.type === 'PP_PUT_POST') { DB.putPost(msg.post).then(function () { sendResponse({ ok: true }); }); return true; }
   if (msg.type === 'PP_DELETE_POST') { DB.deletePost(msg.id).then(function () { sendResponse({ ok: true }); }); return true; }
-  if (msg.type === 'PP_CLEAR_LIBRARY') { DB.clearPosts().then(function () { sendResponse({ ok: true }); }); return true; }
+  if (msg.type === 'PP_CLEAR_LIBRARY') {
+    (async function () {
+      await DB.clearPosts(); await DB.clearJobs(); await DB.clearBlobs();
+      sendResponse({ ok: true });
+    })().catch(function (e) { sendResponse({ ok: false, error: String(e.message || e) }); });
+    return true;
+  }
 
   if (msg.type === 'PP_GET_JOBS') { Queue.list().then(function (j) { sendResponse({ ok: true, data: j }); }); return true; }
   if (msg.type === 'PP_JOB_ACTION') {
@@ -103,7 +110,8 @@ chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
     (async function () {
       var tab = null;
       try {
-        tab = await chrome.tabs.create({ url: msg.href, active: false });
+        // Visible, user-initiated tab — never hidden or silently closed.
+        tab = await chrome.tabs.create({ url: msg.href, active: true });
         await new Promise(function (r) { setTimeout(r, 1200); });
         await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['src/shared/utils.js'] });
         var injected = await chrome.scripting.executeScript({
@@ -140,7 +148,7 @@ chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
       } catch (e) {
         sendResponse({ ok: false, error: String((e && e.message) || e) });
       } finally {
-        if (tab) { try { await chrome.tabs.remove(tab.id); } catch (e) {} }
+        // The viewer stays open. The user closes it when finished.
       }
     })();
     return true;

@@ -41,9 +41,9 @@
     }
   });
 
-  function downloadOne(url, filename) {
+  function downloadOne(url, filename, conflictAction) {
     return new Promise(function (resolve) {
-      chrome.downloads.download({ url: url, filename: filename, conflictAction: 'uniquify', saveAs: false }, function (id) {
+      chrome.downloads.download({ url: url, filename: filename, conflictAction: conflictAction || 'uniquify', saveAs: false }, function (id) {
         if (chrome.runtime.lastError || !id) {
           var message = (chrome.runtime.lastError && chrome.runtime.lastError.message) || 'no id';
           console.warn('[PostPocket] download failed:', message, 'file:', filename, 'url:', String(url).slice(0, 90));
@@ -60,7 +60,7 @@
   }
 
   async function fetchWithSession(url) {
-    var res = await fetch(url, { credentials: 'include' });
+    var res = await fetch(url, { credentials: 'include', signal: AbortSignal.timeout(15000) });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     return await res.blob();
   }
@@ -78,27 +78,54 @@
     while (active.has(id) && active.get(id).paused) await U.sleep(200);
   }
 
+  async function hashExists(hash) {
+    if (!hash) return false;
+    try {
+      var posts = await DB.allPosts();
+      return posts.some(function (p) {
+        return (p.images || []).some(function (im) { return im.hash === hash; });
+      });
+    } catch (e) { return false; }
+  }
+
   async function processImage(job, post, img, index, settings) {
     var ext = img.ext || 'jpg';
     var filename = Naming.destination(post, settings) + '/' + Naming.imageName(post, index + 1, ext, settings);
     var result = { index: index + 1, ok: false, filename: filename, sourceUrl: img.url, error: '' };
+    if (!img.url && !img.importKey) { result.error = 'No image source'; return result; }
     var blob = null;
 
-    if (settings.storeImages) {
+    if (img.local && img.importKey) {
+      try { blob = await DB.getBlob(img.importKey); } catch (e) { blob = null; }
+    }
+    if (!blob && img.url && settings.storeImages) {
       try { blob = await fetchWithSession(img.url); } catch (e) { blob = null; }
     }
 
-    // Prefer the bytes we already fetched (session cookies included) as a
-    // data URL — Chrome reliably supports data: in downloads.download.
-    var r = { ok: false, error: 'no attempt' };
-    if (blob) {
-      try { r = await downloadOne(await U.blobToDataUrl(blob), filename); }
-      catch (e) { r = { ok: false, error: String(e.message || e) }; }
+    if (blob) result.hash = await hashBlob(blob);
+    if (result.hash && settings.duplicateMode !== 'review' && await hashExists(result.hash)) {
+      result.ok = true;
+      result.duplicate = true;
+      return result;
     }
-    if (!r.ok) r = await downloadOne(img.url, filename);
+
+    // Prefer bytes we already fetched, handed to the downloader as a short
+    // offscreen blob URL (no base64 string, no large IPC payload).
+    var r = { ok: false, error: 'no attempt' };
+    var conflict = settings.existingFiles === 'replace' ? 'overwrite' : 'uniquify';
+    var tmpKey = null, tmpUrl = null;
+    if (blob) {
+      try {
+        tmpKey = 'tmp:' + U.uid('dl');
+        var br = await PPBlob.urlForBlob(blob, tmpKey);
+        if (br.ok) { tmpUrl = br.url; r = await downloadOne(tmpUrl, filename, conflict); }
+      } catch (e) { r = { ok: false, error: String(e.message || e) }; }
+    }
+    if (!r.ok) r = await downloadOne(img.url, filename, conflict);
+    if (tmpUrl) await PPBlob.revoke(tmpUrl, tmpKey);
     if (!r.ok && img.alternates && img.alternates.length) {
       for (var i = 0; i < img.alternates.length; i++) {
-        r = await downloadOne(img.alternates[i], filename);
+        r = await downloadOne(img.alternates[i], filename, conflict);
         if (r.ok) break;
       }
     }
@@ -108,7 +135,6 @@
 
     if (blob && settings.storeImages) {
       await DB.putBlob(job.id + ':' + post.id + ':' + index, blob);
-      result.hash = await hashBlob(blob);
       result.bytes = blob.size;
     }
     return result;
@@ -169,6 +195,16 @@
         var img = post.images[idx];
         if (!img) continue;
 
+        // Resume support: never redo work already completed before a restart.
+        var cursor = job.cursor;
+        if (cursor && (pi < cursor.pi || (pi === cursor.pi && ii <= cursor.ii))) continue;
+        var alreadyDone = (job.results || []).some(function (r) {
+          return r.ok && r.postId === post.id && r.index === idx + 1;
+        });
+        if (alreadyDone) continue;
+        job.cursor = { pi: pi, ii: ii };
+        emit(job);
+
         var attempt = 0;
         var res = null;
         while (attempt <= (settings.retryCount || 0)) {
@@ -197,13 +233,11 @@
       await DB.putPost(record);
     }
 
+    job.cursor = null;
     job.finishedAt = Date.now();
     emit(job);
     active.delete(job.id);
     broadcast('PP_JOB_FINISHED', { jobId: job.id, status: job.status });
-    if (settings.notifications) {
-      try { chrome.notifications.create({ type: 'basic', iconUrl: 'icons/icon48.png', title: 'PostPocket', message: job.status === 'done' ? 'Collection saved: ' + job.done + ' images' : 'Finished with ' + failed + ' failed image(s)' }); } catch (e) {}
-    }
   }
 
   var Queue = {
