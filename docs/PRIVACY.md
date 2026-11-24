@@ -52,12 +52,13 @@ Meta restricts automated collection without written permission. PostPocket is de
 
 | Permission | Why |
 | --- | --- |
-| `downloads` | Save images and ZIPs into organized folders |
+| `downloads` | Save images, videos and ZIPs into organized folders |
 | `storage` | Remember your preferences locally |
-| `tabs`, `activeTab` | Read the current Facebook post you choose to scan |
-| `notifications` | Optional "collection finished" notice |
-| `scripting` | Read the Facebook photo viewer opened by the `+N` tile in a background tab |
-| `facebook.com`, `fbcdn.net` host access | Load images you already have access to |
+| `activeTab` | Act only on the Facebook tab you choose |
+| `offscreen` | Hand downloaded bytes to Chrome's downloader without large messages |
+| `unlimitedStorage` | Keep image/video blobs locally until you export them |
+| `sidePanel` | Show the PostPocket dashboard in Chrome's side panel |
+| `facebook.com`, `fbcdn.net` host access | Load media you already have access to |
 
 ## 8. Contact
 

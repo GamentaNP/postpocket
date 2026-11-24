@@ -97,9 +97,9 @@ All user-facing strings, defaults, nav items, groups and message names live in `
 
 - Reads **only** the page you are viewing. No crawling, no background indexing.
 - Local files, folders, ZIPs and Facebook data-export folders are imported and stored entirely on this device.
-- One post at a time, started manually. Downloads are sequential and gently staggered.
+- One post at a time, started manually. Downloads run one at a time by default, with an optional parallel-tasks setting and gentle staggering.
 - Uses your normal browser session; never asks for a password, cookie, token or login code.
-- Does not include the `chrome.cookies` permission and has no stealth/anti-detection code. The `scripting` permission is used only to read the photo viewer you explicitly open via the `+N` tile.
+- Does not include the `chrome.cookies` permission and has no stealth/anti-detection code. The photo viewer is read by the declared content script on the tab you explicitly open via the `+N` tile.
 - Respects access controls: if you cannot see an image, it cannot save it.
 - No analytics, telemetry, remote JavaScript, cloud sync or developer-side storage.
 
@@ -111,8 +111,8 @@ See `PRIVACY.md` and `STORE_LISTING.md`.
 
 - `npm run build` — TypeScript check + Vite build passes with zero errors.
 - All vanilla JS files pass `node --check`.
-- ZIP create/read round-trip test passes (`node tests/zip-test.js`).
+- ZIP create/read round-trip test passes (`node tests/zip-test.cjs`).
 - Built popup, side panel and dashboard rendered in a browser with demo data — zero console errors.
 - Live Facebook DOM verified: post anchored via `aria-label="Actions for this post"`, source link detected from `/groups/<id>/`.
 
-**Deferred per spec:** Meta Graph API connector (needs approval), AI categorization, similar-image detection.
+**Not included:** Meta Graph API connector (Meta requires an app review and an access token; browser cookies cannot authenticate it), AI categorization, similar-image detection.

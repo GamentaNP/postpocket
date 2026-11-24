@@ -4,7 +4,7 @@
   "short_name": "PostPocket",
   "version": "2.2.0",
   "description": "One post. One folder. Every image together. Organize Facebook photos locally, import your own archive, and export ZIPs — all on your device.",
-  "permissions": ["downloads", "storage", "activeTab", "scripting", "offscreen", "unlimitedStorage"],
+  "permissions": ["downloads", "storage", "activeTab", "offscreen", "unlimitedStorage", "sidePanel"],
   "host_permissions": [
     "https://www.facebook.com/*",
     "https://*.facebook.com/*",
@@ -45,12 +45,6 @@
       ],
       "run_at": "document_idle",
       "all_frames": false
-    }
-  ],
-  "web_accessible_resources": [
-    {
-      "resources": ["dist/*", "icons/*"],
-      "matches": ["<all_urls>"]
     }
   ]
 }
