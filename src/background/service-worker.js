@@ -112,7 +112,7 @@ chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
     // work here, so a service-worker restart cannot strand the request.
     var token = U.uid('v');
     var key = 'pp_viewer_' + token;
-    var href = msg.href + (msg.href.indexOf('#') >= 0 ? '&' : '#') + 'pp-expand=' + token;
+    var href = msg.href + '#pp-expand=' + token;
     var settled = false;
     var timer = setTimeout(function () {
       if (settled) return;

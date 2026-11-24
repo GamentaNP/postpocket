@@ -1,6 +1,6 @@
 # Privacy Policy — PostPocket
 
-**Effective date:** 2026-11-20
+**Effective date:** 2026-11-24
 
 PostPocket is a local-first browser extension for organizing Facebook post photos. This document explains exactly what data it touches and where that data goes.
 

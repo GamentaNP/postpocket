@@ -107,26 +107,11 @@
     return data;
   }
 
-  function extractViewerImages() {
-    var out = [], seen = new Set();
-    Array.prototype.forEach.call(document.querySelectorAll('img'), function (im) {
-      var src = im.currentSrc || im.src || '';
-      if (!/scontent.*fbcdn/i.test(src)) return;
-      if ((im.naturalWidth || 0) < 200) return;
-      var key = src.split('?')[0];
-      if (seen.has(key)) return;
-      seen.add(key);
-      out.push({ url: src, alternates: [], ext: U ? U.extFromUrl(src) : 'jpg', width: im.naturalWidth, height: im.naturalHeight });
-    });
-    return out;
-  }
-
   function expandPost(post) {
     if (!post.expandHref || post.expanded || post.expanding) return Promise.resolve(post.images);
     post.expanding = true;
     var token = (U ? U.uid('v') : ('v' + Date.now().toString(36)));
-    var sep = post.expandHref.indexOf('#') >= 0 ? '&' : '#';
-    var href = post.expandHref + sep + 'pp-expand=' + token;
+    var href = post.expandHref + '#pp-expand=' + token;
     // Visible tab, opened from a real click. It stays open until you close it.
     window.open(href, '_blank', 'noopener');
     var key = VIEWER_PREFIX + token;
