@@ -100,8 +100,6 @@ export function demoSettings(): Settings {
   return {
     destination: 'downloads',
     rootFolder: APP.defaultRootFolder,
-    folderHandleName: '',
-    quality: 'largest',
     formats: ['jpg', 'png', 'webp', 'gif'],
     quantity: 'all',
     quantityValue: 25,

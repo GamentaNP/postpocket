@@ -180,6 +180,30 @@
     job.results = job.results || [];
     emit(job);
 
+    var limit = Math.max(1, parseInt(settings.concurrency, 10) || 1);
+    var inFlight = new Set();
+
+    // Runs one image with retries and records the result.
+    async function runOne(post, idx) {
+      try {
+        var attempt = 0;
+        var res = null;
+        while (attempt <= (settings.retryCount || 0)) {
+          res = await processImage(job, post, post.images[idx], idx, settings);
+          if (res.ok) break;
+          attempt++;
+          if (attempt <= (settings.retryCount || 0)) await U.sleep(400 * attempt);
+        }
+        res.postId = post.id;
+        job.results.push(res);
+      } catch (e) {
+        job.results.push({ postId: post.id, index: idx + 1, ok: false, error: String(e && e.message || e) });
+      }
+      job.done++;
+      emit(job);
+      if (settings.delayMs) await U.sleep(Math.min(1000, settings.delayMs));
+    }
+
     for (var pi = 0; pi < posts.length; pi++) {
       if (!active.has(job.id) || control.cancelled) break;
       await waitIfPaused(job, job.id);
@@ -205,21 +229,13 @@
         job.cursor = { pi: pi, ii: ii };
         emit(job);
 
-        var attempt = 0;
-        var res = null;
-        while (attempt <= (settings.retryCount || 0)) {
-          res = await processImage(job, post, img, idx, settings);
-          if (res.ok) break;
-          attempt++;
-          if (attempt <= (settings.retryCount || 0)) await U.sleep(400 * attempt);
-        }
-        res.postId = post.id;
-        job.results.push(res);
-        job.done++;
-        emit(job);
-        if (settings.delayMs) await U.sleep(Math.min(1000, settings.delayMs));
+        // Concurrency: keep up to `limit` image downloads in flight at once.
+        var p = runOne(post, idx).then(function () { inFlight.delete(p); });
+        inFlight.add(p);
+        if (inFlight.size >= limit) await Promise.race(Array.from(inFlight));
       }
     }
+    if (!control.cancelled && inFlight.size) await Promise.all(Array.from(inFlight));
 
     var failed = job.results.filter(function (r) { return !r.ok; }).length;
     if (control.cancelled) job.status = 'cancelled';

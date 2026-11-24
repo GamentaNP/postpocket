@@ -6,8 +6,6 @@
     // download
     destination: 'downloads',       // downloads | ask | folder | zip
     rootFolder: 'PostPocket',
-    folderHandleName: '',
-    quality: 'largest',             // largest | original | smaller
     formats: ['jpg', 'png', 'webp', 'gif'],
     quantity: 'all',                // all | latest | custom
     quantityValue: 25,

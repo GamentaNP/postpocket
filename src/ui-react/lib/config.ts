@@ -40,7 +40,7 @@ export const EXPORT_MODES = [
 ] as const
 
 export const SETTINGS_GROUPS = [
-  { id: 'download', label: 'Download settings', hint: 'Destination, formats, quality and limits' },
+  { id: 'download', label: 'Download settings', hint: 'Destination, formats and limits' },
   { id: 'folder', label: 'Folder settings', hint: 'Naming, structure and organization' },
   { id: 'preview', label: 'Preview settings', hint: 'Inline, side panel, new tab and gallery' },
   { id: 'queue', label: 'Queue settings', hint: 'Concurrency, retry and pause behavior' },

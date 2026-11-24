@@ -71,8 +71,6 @@ export interface Job {
 export interface Settings {
   destination: string
   rootFolder: string
-  folderHandleName: string
-  quality: string
   formats: string[]
   quantity: string
   quantityValue: number
