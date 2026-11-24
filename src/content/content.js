@@ -155,7 +155,7 @@
     if (!indices.length) return;
     chrome.runtime.sendMessage({
       type: 'PP_COLLECT',
-      payload: { posts: [Object.assign({}, post, { selectedImages: indices })] }
+      posts: [Object.assign({}, post, { selectedImages: indices })]
     }, function (res) {
       if (res && res.ok && btn) {
         btn.classList.add('ppf-done');
