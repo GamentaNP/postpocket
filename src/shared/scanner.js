@@ -258,6 +258,29 @@
       }
       out.push({ url: url, alternates: alts, width: naturalW, height: naturalH, ext: U.extFromUrl(url) });
     });
+    return out.concat(collectVideos(post));
+  }
+
+  /** Videos/Reels/Stories: capture the video source URLs and any poster frame. */
+  function collectVideos(post) {
+    if (!post) return [];
+    var out = [], seen = new Set();
+    Array.prototype.forEach.call(post.querySelectorAll('video'), function (v) {
+      var src = v.currentSrc || v.getAttribute('src') || '';
+      if (!/^https?:/i.test(src)) return;
+      var key = src.split('?')[0];
+      if (seen.has(key)) return;
+      seen.add(key);
+      out.push({
+        url: src,
+        alternates: [],
+        ext: U.extFromUrl(src),
+        video: true,
+        poster: v.getAttribute('poster') || '',
+        width: v.naturalWidth || 0,
+        height: v.naturalHeight || 0
+      });
+    });
     return out;
   }
 

@@ -38,7 +38,7 @@ export default function CollectView({ settings, onOpenDashboard, initialMethod =
       })
     }
     found = found.map((p) => {
-      let images = p.images.filter((im) => !settings.formats?.length || settings.formats.includes(im.ext || 'jpg'))
+      let images = p.images.filter((im) => !settings.formats?.length || settings.formats.includes(im.ext || 'jpg') || !!im.video)
       if (settings.imageOrder === 'filename') images = images.slice().sort((a, b) => String(a.name || a.url).localeCompare(String(b.name || b.url)))
       if (settings.imageOrder === 'date') images = images.slice().sort((a, b) => (b.width || 0) - (a.width || 0))
       if (settings.quantity !== 'all') images = images.slice(0, Number(settings.quantityValue) || 25)

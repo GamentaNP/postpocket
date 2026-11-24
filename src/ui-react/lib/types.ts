@@ -11,6 +11,8 @@ export interface PostImage {
   importKey?: string
   name?: string
   saved?: boolean
+  video?: boolean
+  poster?: string
 }
 
 export interface Post {
