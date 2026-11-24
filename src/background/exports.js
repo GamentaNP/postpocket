@@ -9,6 +9,9 @@
 
   async function blobForImage(post, index, img) {
     var blob = await DB.getBlob(storedKey(post, index));
+    if (!blob && img.local && img.importKey) {
+      try { blob = await DB.getBlob(img.importKey); } catch (e) {}
+    }
     if (blob) return blob;
     var urls = [img.url].concat(img.alternates || []);
     for (var i = 0; i < urls.length; i++) {
