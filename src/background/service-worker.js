@@ -6,6 +6,7 @@ importScripts(
   '../shared/db.js',
   '../shared/zip.js',
   'blob-url.js',
+  'graph.js',
   'queue.js',
   'exports.js'
 );
@@ -15,6 +16,7 @@ var DB = self.PPDB;
 var Queue = self.PPQueue;
 var Exports = self.PPExports;
 var Settings = self.PPSettings;
+var Graph = self.PPGraph;
 
 chrome.runtime.onInstalled.addListener(function (details) {
   if (details.reason === 'install') {
@@ -54,6 +56,15 @@ chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
     })();
     return true;
   }
+  if (msg.type === 'PP_GRAPH_LOAD') {
+    Graph.load(msg.path, msg.params || {}).then(function (r) {
+      sendResponse({ ok: true, images: r.images, count: r.count });
+    }).catch(function (e) {
+      sendResponse({ ok: false, error: String(e.message || e) });
+    });
+    return true;
+  }
+
   if (msg.type === 'PP_GET_SETTINGS') { Settings.get().then(function (s) { sendResponse({ ok: true, data: s }); }); return true; }
   if (msg.type === 'PP_SET_SETTINGS') { Settings.set(msg.patch).then(function (s) { sendResponse({ ok: true, data: s }); }); return true; }
   if (msg.type === 'PP_RESET_SETTINGS') { Settings.reset().then(function (s) { sendResponse({ ok: true, data: s }); }); return true; }

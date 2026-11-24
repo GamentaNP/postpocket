@@ -17,6 +17,7 @@ export function call<T = any>(type: string, payload: Record<string, any> = {}): 
 
 export const api = {
   scan: (mode: 'current' | 'all') => call(MESSAGE.SCAN, { mode }),
+  graphLoad: (path: string, params?: any) => call(MESSAGE.GRAPH_LOAD, { path, params }),
   expandPost: (href: string) => call(MESSAGE.EXPAND_POST, { href }),
   settings: () => call(MESSAGE.GET_SETTINGS),
   setSettings: (patch: Partial<any>) => call(MESSAGE.SET_SETTINGS, { patch }),

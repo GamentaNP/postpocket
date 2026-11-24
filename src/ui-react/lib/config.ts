@@ -31,6 +31,7 @@ export const COLLECT_METHODS = [
   { id: 'urls', icon: '⌁', title: 'Post URL queue', desc: 'Paste post links and keep them organized in a queue.' },
   { id: 'local', icon: '⇪', title: 'Local files / folder', desc: 'Import images, folders or ZIPs already on your computer.' },
   { id: 'archive', icon: '▣', title: 'Facebook archive', desc: 'Import a folder exported from your own Facebook account.' },
+  { id: 'graph', icon: '⌐', title: 'Meta Graph API', desc: 'Load photos from a Graph API endpoint using your browser session.' },
 ] as const
 
 export const EXPORT_MODES = [
@@ -66,6 +67,7 @@ export const NAMING_TOKENS = ['date', 'year', 'month', 'source', 'type', 'author
 export const MESSAGE = {
   PING: 'PP_PING',
   SCAN: 'PP_SCAN',
+  GRAPH_LOAD: 'PP_GRAPH_LOAD',
   EXPAND_POST: 'PP_EXPAND_POST',
   OPEN_DASHBOARD: 'PP_OPEN_DASHBOARD',
   OPEN_SIDEPANEL: 'PP_OPEN_SIDEPANEL',

@@ -53,6 +53,28 @@ export default function CollectView({ settings, onOpenDashboard, initialMethod =
     toast(`Captured ${found.length} post(s)`)
   }
 
+  async function loadGraph() {
+    const area = document.getElementById('graphPath') as HTMLInputElement | null
+    const path = area ? area.value.trim() : ''
+    if (!path) { toast('Enter a Graph API path, e.g. {group-id}/photos', 'warn'); return }
+    setBusy(true)
+    const r = await api.graphLoad(path)
+    setBusy(false)
+    if (!r.ok) { toast(r.error || 'Could not load', 'error'); return }
+    const images = (r.data || []).map((im: any) => ({ url: im.url, alternates: im.alternates || [], ext: im.ext || 'jpg' }))
+    if (!images.length) { toast('No photos returned from the API', 'warn'); return }
+    const post: Post = {
+      id: uid('post'), postId: uid('graph').slice(-10), sourceType: 'Graph',
+      sourceName: path.slice(0, 60), author: 'API',
+      date: new Date().toISOString().slice(0, 10), title: path.slice(0, 60),
+      text: '', postUrl: '', images, found: true,
+    }
+    setPosts([...posts, post]); setSelected(new Set([...selectedPosts, post.id]))
+    setImageSelection({ ...imageSelection, [post.id]: new Set(images.map((_, i) => i)) })
+    toast(`Loaded ${images.length} photo(s)`)
+    if (area) area.value = ''
+  }
+
   async function resolveUrl(post: Post) {
     if (!post.postUrl) return
     toast('Opening the photo viewer in a visible tab…')
@@ -188,6 +210,16 @@ export default function CollectView({ settings, onOpenDashboard, initialMethod =
             <label className="field"><span>Select {method === 'archive' ? 'folder' : 'files'}</span>
               <input type="file" multiple={method !== 'archive'} {...(method === 'archive' ? { webkitdirectory: '' } : {})} accept={method === 'archive' ? undefined : 'image/*,.zip'} onChange={(e) => handleFiles(e.target.files)} />
             </label>
+          </>
+        )}
+        {method === 'graph' && (
+          <>
+            <div className="card-head"><h3>Meta Graph API connector</h3><span className="scan-state">Your browser session — no login or token needed</span></div>
+            <p style={{ color: 'var(--muted)', fontSize: 12 }}>Load a Graph API endpoint. Some endpoints need Meta app approval.</p>
+            <label className="field"><span>Graph endpoint path</span>
+              <input id="graphPath" placeholder="{group-id}/photos?fields=picture,id" />
+            </label>
+            <button className="btn primary" disabled={busy} onClick={loadGraph}>Load photos</button>
           </>
         )}
       </div>
