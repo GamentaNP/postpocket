@@ -87,6 +87,9 @@
       // scan fast even when a post has 20+ photos.
       return Promise.all(post.images.slice(0, 9).map(async function (im) {
         try {
+          // Videos are previewed via their poster; never fetch the video bytes
+          // just to build a thumbnail (createImageBitmap cannot decode them).
+          if (im.video) return;
           if (!im.url || !/^https?:/i.test(im.url)) return;
           var controller = new AbortController();
           var timer = setTimeout(function () { controller.abort(); }, 1800);
