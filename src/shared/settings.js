@@ -18,7 +18,6 @@
     prefix: '',
     organizeBy: 'none',             // none | source | month | year | topic
     existingFiles: 'uniquify',      // uniquify | replace | rename
-    imageOrder: 'original',         // original | filename | date
     // metadata
     saveMetadata: true,
     metaCaption: true,

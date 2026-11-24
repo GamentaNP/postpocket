@@ -84,7 +84,6 @@ export interface Settings {
   prefix: string
   organizeBy: string
   existingFiles: string
-  imageOrder: string
   saveMetadata: boolean
   metaCaption: boolean
   metaDate: boolean

@@ -111,7 +111,6 @@ export function demoSettings(): Settings {
     prefix: '',
     organizeBy: 'none',
     existingFiles: 'uniquify',
-    imageOrder: 'original',
     saveMetadata: true,
     metaCaption: true,
     metaDate: true,
