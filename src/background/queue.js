@@ -22,6 +22,10 @@
   }
 
   function emit(job) {
+    // A job removed by the user must not be resurrected by a late download
+    // completion or by runJob's final emit.
+    var control = active.get(job.id);
+    if (control && control.removed) return;
     job.updatedAt = Date.now();
     DB.putJob(job).catch(function () {});
     broadcast('PP_JOB_UPDATE', { job: job });
@@ -219,9 +223,9 @@
         var img = post.images[idx];
         if (!img) continue;
 
-        // Resume support: never redo work already completed before a restart.
-        var cursor = job.cursor;
-        if (cursor && (pi < cursor.pi || (pi === cursor.pi && ii <= cursor.ii))) continue;
+        // Resume support: only skip images already recorded as successful.
+        // The old cursor check also skipped the item that was mid-flight when
+        // the worker died, so that item was never retried.
         var alreadyDone = (job.results || []).some(function (r) {
           return r.ok && r.postId === post.id && r.index === idx + 1;
         });
@@ -230,12 +234,16 @@
         emit(job);
 
         // Concurrency: keep up to `limit` image downloads in flight at once.
-        var p = runOne(post, idx).then(function () { inFlight.delete(p); });
+        // `let` is required here: a `var` would make every .then callback see
+        // the last promise assigned in the loop and delete the wrong entry.
+        let p = runOne(post, idx).then(function () { inFlight.delete(p); });
         inFlight.add(p);
         if (inFlight.size >= limit) await Promise.race(Array.from(inFlight));
       }
     }
-    if (!control.cancelled && inFlight.size) await Promise.all(Array.from(inFlight));
+    // Always drain in-flight work before writing the final status, otherwise a
+    // cancelled/finished job can be marked final while downloads still run.
+    if (inFlight.size) await Promise.all(Array.from(inFlight));
 
     var failed = job.results.filter(function (r) { return !r.ok; }).length;
     if (control.cancelled) job.status = 'cancelled';
@@ -321,7 +329,10 @@
 
     remove: async function (id) {
       await Queue.cancel(id);
-      await U.sleep(250);
+      var c = active.get(id);
+      if (c) c.removed = true;
+      // Let the running job unwind so its final emit cannot recreate the row.
+      for (var i = 0; i < 100 && active.has(id); i++) await U.sleep(100);
       await DB.deleteJob(id);
       broadcast('PP_JOB_UPDATE', { job: { id: id, removed: true } });
     },
