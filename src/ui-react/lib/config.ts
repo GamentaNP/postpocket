@@ -2,7 +2,7 @@
 export const APP = {
   name: 'PostPocket',
   fullName: 'PostPocket — Facebook Photo Organizer',
-  version: '2.1.0',
+  version: '2.2.0',
   tagline: 'One post. One folder. Every image together.',
   subtitle: 'Local-first image organizer',
   defaultRootFolder: 'PostPocket',

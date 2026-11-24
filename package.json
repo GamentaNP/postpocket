@@ -1,7 +1,7 @@
 {
   "name": "postpocket",
   "private": true,
-  "version": "2.1.0",
+  "version": "2.2.0",
   "type": "module",
   "description": "PostPocket — local-first Facebook post image organizer (Chrome MV3 extension)",
   "scripts": {
