@@ -267,18 +267,28 @@
     var out = [], seen = new Set();
     Array.prototype.forEach.call(post.querySelectorAll('video'), function (v) {
       var src = v.currentSrc || v.getAttribute('src') || '';
+      // Some players use <source> children or a blob: currentSrc. Prefer a
+      // real https source when the element exposes one.
+      if (!/^https?:/i.test(src)) {
+        var sources = v.querySelectorAll('source');
+        for (var s = 0; s < sources.length; s++) {
+          var candidate = sources[s].src || sources[s].getAttribute('src') || '';
+          if (/^https?:/i.test(candidate)) { src = candidate; break; }
+        }
+      }
       if (!/^https?:/i.test(src)) return;
       var key = src.split('?')[0];
       if (seen.has(key)) return;
       seen.add(key);
+      var vm = String(src).match(/\.(mp4|m4v|webm|mov|ogv)(\?|#|$)/i);
       out.push({
         url: src,
         alternates: [],
-        ext: U.extFromUrl(src),
+        ext: vm ? vm[1].toLowerCase() : 'mp4',
         video: true,
         poster: v.getAttribute('poster') || '',
-        width: v.naturalWidth || 0,
-        height: v.naturalHeight || 0
+        width: v.videoWidth || 0,
+        height: v.videoHeight || 0
       });
     });
     return out;

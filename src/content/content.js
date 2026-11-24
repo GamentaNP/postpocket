@@ -29,6 +29,7 @@
     '.ppf-grid em{position:absolute;left:4px;top:4px;z-index:2;font-style:normal;font-family:monospace;font-size:10px;background:#fff;color:#000;border-radius:4px;padding:0 4px}',
     '.ppf-grid button:hover{border-color:#fff}',
     '.ppf-grid img{width:100%;height:100%;object-fit:cover;display:block}',
+    '.ppf-grid .ppf-video{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:24px;color:#fff;background:#141414}',
     '.ppf-note{font-size:10px;color:#6b6b6b;margin-top:8px;line-height:1.4}',
     '.ppf-done{background:#fff!important;color:#000!important}'
   ].join('\n');
@@ -154,21 +155,28 @@
     if (oldBody) oldBody.remove();
     var body = document.createElement('div');
     body.className = 'ppf-body';
-    panel.querySelector('.ppf-head').textContent = 'PostPocket · ' + post.images.length + ' images';
+    panel.querySelector('.ppf-head').textContent = 'PostPocket · ' + post.images.length + ' items';
 
     var actions = document.createElement('div');
     actions.className = 'ppf-row';
-    actions.innerHTML = '<button class="primary" data-all>Download all</button><button data-single>Single image</button>';
+    actions.innerHTML = '<button class="primary" data-all>Download all</button><button data-single>Single item</button>';
     body.appendChild(actions);
     var grid = document.createElement('div');
     grid.className = 'ppf-grid';
     post.images.forEach(function (im, i) {
       var b = document.createElement('button');
-      b.title = 'Save image ' + (i + 1);
-      var img = document.createElement('img');
-      img.src = im.url; // page context: Facebook CDN URL loads normally here
-      img.alt = 'Image ' + (i + 1);
-      b.appendChild(img);
+      b.title = (im.video ? 'Save video ' : 'Save image ') + (i + 1);
+      if (im.video && !im.poster) {
+        var play = document.createElement('span');
+        play.className = 'ppf-video';
+        play.textContent = '▶';
+        b.appendChild(play);
+      } else {
+        var img = document.createElement('img');
+        img.src = im.video ? im.poster : im.url; // page context: Facebook CDN URL loads normally here
+        img.alt = (im.video ? 'Video ' : 'Image ') + (i + 1);
+        b.appendChild(img);
+      }
       var num = document.createElement('em');
       num.textContent = String(i + 1);
       b.appendChild(num);
@@ -179,8 +187,8 @@
     var note = document.createElement('div');
     note.className = 'ppf-note';
     note.textContent = post.extraCount && !post.expanded
-      ? 'Hidden photos open a visible Facebook tab (you can close it anytime). Only images in your session are saved.'
-      : 'Only images already visible in your session. One post at a time, gently downloaded.';
+      ? 'Hidden photos open a visible Facebook tab (you can close it anytime). Only media in your session is saved.'
+      : 'Only media already visible in your session. One post at a time, gently downloaded.';
     body.appendChild(note);
     panel.appendChild(body);
 
@@ -189,7 +197,7 @@
     });
     actions.querySelector('[data-single]').addEventListener('click', function () {
       grid.scrollTop = 0;
-      panel.querySelector('.ppf-head').textContent = 'Click one image to save it';
+      panel.querySelector('.ppf-head').textContent = 'Click one item to save it';
     });
     btn.querySelector('b').textContent = String(post.images.length);
   }
@@ -199,7 +207,7 @@
     if (old) { old.remove(); return; }
     var panel = document.createElement('div');
     panel.className = 'ppf-panel';
-    panel.innerHTML = '<div class="ppf-head">PostPocket · ' + post.images.length + ' images</div>';
+    panel.innerHTML = '<div class="ppf-head">PostPocket · ' + post.images.length + ' items</div>';
     widget.appendChild(panel);
 
     if (post.extraCount && !post.expanded && post.expandHref) {

@@ -37,6 +37,7 @@ export function debounce<T extends (...args: any[]) => void>(fn: T, ms = 200): T
   }) as T
 }
 
-export function imageSrc(image?: { thumb?: string; url?: string }): string {
+export function imageSrc(image?: { thumb?: string; url?: string; poster?: string; video?: boolean }): string {
+  if (image?.video) return image.poster || image.thumb || ''
   return image?.thumb || image?.url || ''
 }

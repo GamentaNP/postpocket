@@ -141,8 +141,8 @@ export function ThumbGrid({ images, selected, onToggle, size = 'medium' }: {
   return (
     <div className={`grid ${size}`}>
       {images.map((im, i) => (
-        <button key={`${im.url}-${i}`} className={`thumb ${selected.has(i) ? 'selected' : ''}`} onClick={() => onToggle(i)} title={`Image ${i + 1}`}>
-          {imageSrc(im) ? <img src={imageSrc(im)} alt={`Image ${i + 1}`} loading="lazy" /> : <div className="thumb-placeholder">#{i + 1}</div>}
+        <button key={`${im.url}-${i}`} className={`thumb ${selected.has(i) ? 'selected' : ''}`} onClick={() => onToggle(i)} title={`${im.video ? 'Video' : 'Image'} ${i + 1}`}>
+          {imageSrc(im) ? <img src={imageSrc(im)} alt={`${im.video ? 'Video' : 'Image'} ${i + 1}`} loading="lazy" /> : <div className="thumb-placeholder">#{i + 1}</div>}
           <span className="num">{String(i + 1).padStart(2, '0')}</span>
           <span className="tick">✓</span>
         </button>
