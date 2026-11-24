@@ -53,28 +53,6 @@ export default function CollectView({ settings, onOpenDashboard, initialMethod =
     toast(`Captured ${found.length} post(s)`)
   }
 
-  async function loadGraph() {
-    const area = document.getElementById('graphPath') as HTMLInputElement | null
-    const path = area ? area.value.trim() : ''
-    if (!path) { toast('Enter a Graph API path, e.g. {group-id}/photos', 'warn'); return }
-    setBusy(true)
-    const r = await api.graphLoad(path)
-    setBusy(false)
-    if (!r.ok) { toast(r.error || 'Could not load', 'error'); return }
-    const images = (r.data || []).map((im: any) => ({ url: im.url, alternates: im.alternates || [], ext: im.ext || 'jpg' }))
-    if (!images.length) { toast('No photos returned from the API', 'warn'); return }
-    const post: Post = {
-      id: uid('post'), postId: uid('graph').slice(-10), sourceType: 'Graph',
-      sourceName: path.slice(0, 60), author: 'API',
-      date: new Date().toISOString().slice(0, 10), title: path.slice(0, 60),
-      text: '', postUrl: '', images, found: true,
-    }
-    setPosts([...posts, post]); setSelected(new Set([...selectedPosts, post.id]))
-    setImageSelection({ ...imageSelection, [post.id]: new Set(images.map((_, i) => i)) })
-    toast(`Loaded ${images.length} photo(s)`)
-    if (area) area.value = ''
-  }
-
   async function resolveUrl(post: Post) {
     if (!post.postUrl) return
     toast('Opening the photo viewer in a visible tab…')
@@ -212,16 +190,6 @@ export default function CollectView({ settings, onOpenDashboard, initialMethod =
             </label>
           </>
         )}
-        {method === 'graph' && (
-          <>
-            <div className="card-head"><h3>Meta Graph API connector</h3><span className="scan-state">Your browser session — no login or token needed</span></div>
-            <p style={{ color: 'var(--muted)', fontSize: 12 }}>Load a Graph API endpoint. Some endpoints need Meta app approval.</p>
-            <label className="field"><span>Graph endpoint path</span>
-              <input id="graphPath" placeholder="{group-id}/photos?fields=picture,id" />
-            </label>
-            <button className="btn primary" disabled={busy} onClick={loadGraph}>Load photos</button>
-          </>
-        )}
       </div>
 
       {posts.length > 0 && (
@@ -231,7 +199,7 @@ export default function CollectView({ settings, onOpenDashboard, initialMethod =
             {posts.map((p) => (
               <div className="row" key={p.id}>
                 {imageSrc(p.images[0]) ? <img className="thumb-mini" src={imageSrc(p.images[0])} alt="" /> : <div className="thumb-mini" />}
-                <div className="grow"><div className="t">{p.title}</div><div className="m">{p.sourceType} · {p.sourceName} · {p.images.length} image(s)</div></div>
+                <div className="grow"><div className="t">{p.title}</div><div className="m">{p.sourceType} · {p.sourceName} · {p.images.length} item(s)</div></div>
                 <label className="check-row" style={{ margin: 0 }}><input type="checkbox" checked={selectedPosts.has(p.id)} onChange={() => togglePost(p.id)} /></label>
                 {!p.images.length && p.postUrl && <button className="btn ghost sm" onClick={() => resolveUrl(p)}>Resolve</button>}
                 {p.postUrl && <a className="btn quiet sm" href={p.postUrl} target="_blank" rel="noreferrer">Open</a>}
@@ -243,7 +211,7 @@ export default function CollectView({ settings, onOpenDashboard, initialMethod =
 
       {chosen.length > 0 && (
         <div className="card">
-          <div className="card-head"><h3>Clean preview &amp; selection</h3><span className="scan-state">{chosen.length} post(s) · {totalSelected} image(s)</span></div>
+          <div className="card-head"><h3>Clean preview &amp; selection</h3><span className="scan-state">{chosen.length} post(s) · {totalSelected} item(s)</span></div>
           <div className="btn-row" style={{ marginBottom: 10 }}>
             <button className="btn quiet sm" onClick={() => setSelected(new Set(posts.map((p) => p.id)))}>Select all posts</button>
             <button className="btn quiet sm" onClick={() => setSelected(new Set())}>Clear</button>
@@ -251,12 +219,12 @@ export default function CollectView({ settings, onOpenDashboard, initialMethod =
               const next: Record<string, Set<number>> = {}
               chosen.forEach((p) => { next[p.id] = new Set(p.images.map((_, i) => i)) })
               setImageSelection(next)
-            }}>Select all images</button>
+            }}>Select all items</button>
           </div>
           {chosen.map((p) => (
             <div key={p.id} style={{ marginBottom: 16 }}>
               <div className="row" style={{ background: 'transparent', border: 'none', padding: '4px 0' }}>
-                <div className="grow"><div className="t">{p.title}</div><div className="m">{p.sourceName} · {p.images.length} images</div></div>
+                <div className="grow"><div className="t">{p.title}</div><div className="m">{p.sourceName} · {p.images.length} items</div></div>
               </div>
               <ThumbGrid images={p.images} selected={imageSelection[p.id] || new Set()} onToggle={(i) => toggleImage(p.id, i)} size={(settings.gridSize || 'medium') as 'small' | 'medium' | 'large'} />
             </div>
